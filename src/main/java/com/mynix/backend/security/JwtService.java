@@ -7,6 +7,7 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
@@ -40,9 +41,15 @@ public class JwtService {
         return extractAllClaims(token).getSubject();
     }
 
-    public boolean isTokenValid(String token, String username) {
-        return extractUsername(token).equals(username)
-                && !extractAllClaims(token).getExpiration().before(new Date());
+    public String extractRole(String token) {
+        return extractAllClaims(token).get("role", String.class);
+    }
+
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        String username = extractUsername(token);
+        return username.equals(userDetails.getUsername())
+                && !isTokenExpired(token);
+
     }
 
     public boolean isTokenExpired(String token) {

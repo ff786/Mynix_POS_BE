@@ -1,4 +1,4 @@
-package com.mynix.backend.entity;
+package com.mynix.backend.model;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -24,19 +24,19 @@ public class User {
     @Column(nullable = false, unique = true)
     private String username;
 
-    @Column(nullable = false)
+    @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private UserRole role;
 
-    @Column(nullable = false)
     @Builder.Default
+    @Column(nullable = false)
     private Boolean active = true;
 
-    @Column(name = "created_at", nullable = false)
     @Builder.Default
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @Column(name = "updated_at")

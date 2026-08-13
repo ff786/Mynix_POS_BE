@@ -1,8 +1,6 @@
-package com.mynix.backend.entity;
+package com.mynix.backend.model;
 
 public enum UserRole {
-
     ADMIN,
     CASHIER
-
 }

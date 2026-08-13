@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/mynix_pos
+    username: postgres
+    password: Farsith@786
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+
+    show-sql: true
+
+  flyway:
+    enabled: true

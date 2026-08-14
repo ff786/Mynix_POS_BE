@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 @Component
@@ -15,10 +16,16 @@ public class InvoiceNumberGenerator {
 
     public String generate() {
 
-        String date = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+        LocalDate today = LocalDate.now();
 
-        long countToday = saleRepository.count() + 1;
+        LocalDateTime start = today.atStartOfDay();
 
-        return String.format("INV-%s-%04d", date, countToday);
+        LocalDateTime end = today.plusDays(1).atStartOfDay();
+
+        long todayCount = saleRepository.countByCreatedAtBetween(start, end) + 1;
+
+        String date = today.format(DateTimeFormatter.BASIC_ISO_DATE);
+
+        return String.format("INV-%s-%04d", date, todayCount);
     }
 }

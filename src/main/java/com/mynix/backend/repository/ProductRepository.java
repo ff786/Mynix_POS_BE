@@ -2,6 +2,7 @@ package com.mynix.backend.repository;
 
 import com.mynix.backend.model.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
 import java.util.Optional;
@@ -16,4 +17,11 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     boolean existsByNameIgnoreCase(String name);
 
+    @Query("""
+        SELECT COUNT(p)
+        FROM Product p
+        WHERE p.active = true
+        AND p.stockQuantity <= p.minimumStock
+        """)
+            long countLowStockProducts();
 }

@@ -109,6 +109,7 @@ public class ProductServiceImpl implements ProductService {
                 .minimumStock(product.getMinimumStock())
                 .imageUrl(product.getImageUrl())
                 .active(product.getActive())
+                .createdAt(product.getCreatedAt())
                 .build();
     }
 }

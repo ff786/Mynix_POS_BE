@@ -54,21 +54,21 @@ public class SecurityConfig {
                                 SessionCreationPolicy.STATELESS
                         )
                 )
-
                 .authorizeHttpRequests(auth -> auth
 
-                        // Public
                         .requestMatchers(
                                 "/api/auth/**"
                         ).permitAll()
 
-                        // ADMIN only
+                        .requestMatchers(
+                                "/api/users/**"
+                        ).hasRole("ADMIN")
+
                         .requestMatchers(
                                 "/api/products/**",
                                 "/api/categories/**"
                         ).hasRole("ADMIN")
 
-                        // ADMIN + CASHIER
                         .requestMatchers(
                                 "/api/dashboard/**",
                                 "/api/sales/**",
@@ -78,10 +78,8 @@ public class SecurityConfig {
                                 "CASHIER"
                         )
 
-                        // Everything else requires authentication
                         .anyRequest().authenticated()
                 )
-
                 .addFilterBefore(
                         jwtFilter,
                         UsernamePasswordAuthenticationFilter.class

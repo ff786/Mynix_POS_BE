@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Data
 @Builder
@@ -20,4 +21,5 @@ public class ProductResponse {
     private Integer minimumStock;
     private String imageUrl;
     private Boolean active;
+    private LocalDateTime createdAt;
 }

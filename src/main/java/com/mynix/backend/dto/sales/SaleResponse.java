@@ -12,11 +12,10 @@ import java.time.LocalDateTime;
 public class SaleResponse {
 
     private String invoiceNumber;
-
+    private BigDecimal subtotal;
+    private BigDecimal discount;
     private BigDecimal grandTotal;
-
     private PaymentMethod paymentMethod;
-
     private LocalDateTime createdAt;
 
 }

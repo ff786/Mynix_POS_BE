@@ -1,19 +1,25 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
+
   datasource:
-    url: jdbc:postgresql://localhost:5432/mynix_pos
-    username: postgres
-    password: Farsith@786
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/mynix_pos}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
       ddl-auto: none
 
-    show-sql: true
+    show-sql: false
 
   flyway:
     enabled: true
 
 jwt:
-  secret: 4A0B8F0A9E2B8D5C7F9A6E3D2C1B8A7F5D4E3C2B1A9F8E7D6C5B4A3F2E1D0C9B
-  expiration: 86400000
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+server:
+  port: ${PORT:8080}

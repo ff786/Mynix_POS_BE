@@ -17,7 +17,6 @@ public class SaleServiceImpl implements SaleService {
 
     @Override
     public List<SaleResponse> getAllSales() {
-
         return saleRepository.findAll()
                 .stream()
                 .map(this::map)
@@ -26,7 +25,6 @@ public class SaleServiceImpl implements SaleService {
 
     @Override
     public SaleResponse getSale(String invoiceNumber) {
-
         Sale sale = saleRepository.findByInvoiceNumber(invoiceNumber)
                 .orElseThrow(() -> new RuntimeException("Sale not found"));
 
@@ -34,12 +32,13 @@ public class SaleServiceImpl implements SaleService {
     }
 
     private SaleResponse map(Sale sale) {
-
         return SaleResponse.builder()
                 .invoiceNumber(sale.getInvoiceNumber())
                 .grandTotal(sale.getGrandTotal())
                 .paymentMethod(sale.getPaymentMethod())
                 .createdAt(sale.getCreatedAt())
+                .subtotal(sale.getSubtotal())
+                .discount(sale.getDiscount())
                 .build();
     }
 }

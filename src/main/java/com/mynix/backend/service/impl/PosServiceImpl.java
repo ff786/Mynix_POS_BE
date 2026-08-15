@@ -71,11 +71,31 @@ public class PosServiceImpl implements PosService {
 
             saleItems.add(saleItem);
         }
+
+        BigDecimal discount =
+                request.getDiscount() == null
+                        ? BigDecimal.ZERO
+                        : request.getDiscount();
+        // Discount cannot be negative
+        if (discount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException(
+                    "Discount cannot be negative."
+            );
+        }
+        // Discount cannot exceed subtotal
+        if (discount.compareTo(subtotal) > 0) {
+            throw new RuntimeException(
+                    "Discount cannot be greater than subtotal."
+            );
+        }
+        BigDecimal grandTotal =
+                subtotal.subtract(discount);
+
         Sale sale = Sale.builder()
                 .invoiceNumber(invoiceNumberGenerator.generate())
                 .subtotal(subtotal)
-                .discount(BigDecimal.ZERO)
-                .grandTotal(subtotal)
+                .discount(discount)
+                .grandTotal(grandTotal)
                 .paymentMethod(request.getPaymentMethod())
                 .build();
 
@@ -84,7 +104,6 @@ public class PosServiceImpl implements PosService {
         }
 
         sale.setItems(saleItems);
-
         saleRepository.save(sale);
 
         for (CheckoutItem item : request.getItems()) {

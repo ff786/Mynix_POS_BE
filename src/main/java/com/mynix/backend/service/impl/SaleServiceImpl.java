@@ -37,6 +37,7 @@ public class SaleServiceImpl implements SaleService {
                 .grandTotal(sale.getGrandTotal())
                 .paymentMethod(sale.getPaymentMethod())
                 .createdAt(sale.getCreatedAt())
+                .deliveryFee(sale.getDeliveryFee())
                 .subtotal(sale.getSubtotal())
                 .discount(sale.getDiscount())
                 .build();

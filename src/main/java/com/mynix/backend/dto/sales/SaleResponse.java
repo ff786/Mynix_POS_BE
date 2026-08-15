@@ -17,5 +17,6 @@ public class SaleResponse {
     private BigDecimal grandTotal;
     private PaymentMethod paymentMethod;
     private LocalDateTime createdAt;
+    private BigDecimal deliveryFee;
 
 }

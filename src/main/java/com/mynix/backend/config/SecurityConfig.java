@@ -97,7 +97,8 @@ public class SecurityConfig {
                 new CorsConfiguration();
 
         configuration.setAllowedOrigins(List.of(
-                "http://localhost:5173"
+                "http://localhost:5173",
+                "https://mynix-pos.vercel.app"
         ));
 
         configuration.setAllowedMethods(List.of(

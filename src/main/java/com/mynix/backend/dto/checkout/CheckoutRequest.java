@@ -23,4 +23,8 @@ public class CheckoutRequest {
     @NotNull
     @DecimalMin("0.00")
     private BigDecimal discount = BigDecimal.ZERO;
+
+    @NotNull
+    @DecimalMin("0.00")
+    private BigDecimal deliveryFee = BigDecimal.ZERO;
 }

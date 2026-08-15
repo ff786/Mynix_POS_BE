@@ -10,12 +10,9 @@ import java.math.BigDecimal;
 public class CheckoutResponse {
 
     private String invoiceNumber;
-
     private BigDecimal subtotal;
-
     private BigDecimal discount;
-
     private BigDecimal grandTotal;
-
     private String paymentMethod;
+    private BigDecimal deliveryFee;
 }

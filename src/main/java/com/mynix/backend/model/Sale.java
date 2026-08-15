@@ -31,6 +31,10 @@ public class Sale {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal discount = BigDecimal.ZERO;
 
+    @Builder.Default
+    @Column(name = "delivery_fee", nullable = false, precision = 12, scale = 2)
+    private BigDecimal deliveryFee = BigDecimal.ZERO;
+
     @Column(name = "grand_total", nullable = false, precision = 12, scale = 2)
     private BigDecimal grandTotal;
 

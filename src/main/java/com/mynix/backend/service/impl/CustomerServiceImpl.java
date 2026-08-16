@@ -4,6 +4,7 @@ import com.mynix.backend.dto.customer.CustomerRequest;
 import com.mynix.backend.dto.customer.CustomerResponse;
 import com.mynix.backend.dto.customer.PaymentRequest;
 import com.mynix.backend.dto.customer.PaymentResponse;
+import com.mynix.backend.dto.customer.CustomerTransactionResponse;
 import com.mynix.backend.model.Customer;
 import com.mynix.backend.model.CustomerTransaction;
 import com.mynix.backend.model.CustomerTransactionType;
@@ -11,7 +12,6 @@ import com.mynix.backend.model.PaymentMethod;
 import com.mynix.backend.repository.CustomerRepository;
 import com.mynix.backend.repository.CustomerTransactionRepository;
 import com.mynix.backend.service.CustomerService;
-import com.mynix.backend.dto.customer.CustomerTransactionResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,7 +46,9 @@ public class CustomerServiceImpl implements CustomerService {
                 .active(true)
                 .build();
 
-        return toResponse(customerRepository.save(customer));
+        return toResponse(
+                customerRepository.save(customer)
+        );
     }
 
     @Override
@@ -54,28 +56,37 @@ public class CustomerServiceImpl implements CustomerService {
             Long id,
             CustomerRequest request
     ) {
+
         Customer customer = getCustomer(id);
+
         String name = request.getName().trim();
         String contactNumber = request.getContactNumber().trim();
 
         if (customerRepository.existsByContactNumberAndIdNot(
-                contactNumber, id
+                contactNumber,
+                id
         )) {
+
             throw new RuntimeException(
                     "A customer with this contact number already exists."
             );
         }
+
         customer.setName(name);
         customer.setContactNumber(contactNumber);
 
-        return toResponse(customerRepository.save(customer));
+        return toResponse(
+                customerRepository.save(customer)
+        );
     }
 
     @Override
     @Transactional(readOnly = true)
     public CustomerResponse getById(Long id) {
 
-        return toResponse(getCustomer(id));
+        return toResponse(
+                getCustomer(id)
+        );
     }
 
     @Override
@@ -97,10 +108,12 @@ public class CustomerServiceImpl implements CustomerService {
             return getAll();
         }
 
+        String trimmedQuery = query.trim();
+
         return customerRepository
                 .findByNameContainingIgnoreCaseOrContactNumberContaining(
-                        query.trim(),
-                        query.trim()
+                        trimmedQuery,
+                        trimmedQuery
                 )
                 .stream()
                 .map(this::toResponse)
@@ -118,41 +131,63 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
-    public PaymentResponse recordPayment(Long customerId, PaymentRequest request) {
-        Customer customer = getCustomer(customerId);
+    public PaymentResponse recordPayment(
+            Long customerId,
+            PaymentRequest request
+    ) {
+
+        Customer customer =
+                getCustomer(customerId);
+
         BigDecimal previousOutstanding =
                 calculateOutstanding(customerId);
 
-        if (previousOutstanding.compareTo(BigDecimal.ZERO) <= 0) {
+        if (previousOutstanding.compareTo(
+                BigDecimal.ZERO
+        ) <= 0) {
+
             throw new RuntimeException(
                     "This customer has no outstanding balance."
             );
         }
-        BigDecimal paymentAmount = request.getAmount();
-        if (paymentAmount.compareTo(previousOutstanding) > 0) {
+
+        BigDecimal paymentAmount =
+                request.getAmount();
+
+        if (paymentAmount.compareTo(
+                previousOutstanding
+        ) > 0) {
 
             throw new RuntimeException(
                     "Payment amount cannot exceed the customer's outstanding balance."
             );
         }
+
         if (request.getPaymentMethod() == null) {
 
             throw new RuntimeException(
                     "Payment method is required."
             );
         }
-        if (request.getPaymentMethod() != PaymentMethod.CASH
-                && request.getPaymentMethod() != PaymentMethod.BANK_DEPOSIT
-                && request.getPaymentMethod() != PaymentMethod.CHEQUE) {
+
+        if (request.getPaymentMethod()
+                != PaymentMethod.CASH
+                && request.getPaymentMethod()
+                != PaymentMethod.BANK_DEPOSIT
+                && request.getPaymentMethod()
+                != PaymentMethod.CHEQUE) {
 
             throw new RuntimeException(
                     "Customer payments can only be made by Cash, Bank Deposit or Cheque."
             );
         }
+
         CustomerTransaction transaction =
                 CustomerTransaction.builder()
                         .customer(customer)
-                        .type(CustomerTransactionType.PAYMENT)
+                        .type(
+                                CustomerTransactionType.PAYMENT
+                        )
                         .amount(paymentAmount)
                         .description(
                                 request.getDescription() != null
@@ -162,8 +197,12 @@ public class CustomerServiceImpl implements CustomerService {
                         .build();
 
         transactionRepository.save(transaction);
+
         BigDecimal remainingOutstanding =
-                previousOutstanding.subtract(paymentAmount);
+                previousOutstanding.subtract(
+                        paymentAmount
+                );
+
         return PaymentResponse.builder()
                 .customerId(customer.getId())
                 .customerName(customer.getName())
@@ -171,9 +210,15 @@ public class CustomerServiceImpl implements CustomerService {
                 .paymentMethod(
                         request.getPaymentMethod().name()
                 )
-                .previousOutstanding(previousOutstanding)
-                .remainingOutstanding(remainingOutstanding)
-                .description(transaction.getDescription())
+                .previousOutstanding(
+                        previousOutstanding
+                )
+                .remainingOutstanding(
+                        remainingOutstanding
+                )
+                .description(
+                        transaction.getDescription()
+                )
                 .build();
     }
 
@@ -186,7 +231,9 @@ public class CustomerServiceImpl implements CustomerService {
         getCustomer(customerId);
 
         return transactionRepository
-                .findByCustomerIdOrderByCreatedAtDesc(customerId)
+                .findByCustomerIdOrderByCreatedAtDesc(
+                        customerId
+                )
                 .stream()
                 .map(transaction -> {
 
@@ -194,27 +241,38 @@ public class CustomerServiceImpl implements CustomerService {
                     String invoiceNumber = null;
 
                     if (transaction.getSale() != null) {
-                        saleId = transaction.getSale().getId();
+
+                        saleId =
+                                transaction.getSale().getId();
+
                         invoiceNumber =
-                                transaction.getSale().getInvoiceNumber();
+                                transaction.getSale()
+                                        .getInvoiceNumber();
                     }
 
-                    return CustomerTransactionResponse.builder()
+                    return CustomerTransactionResponse
+                            .builder()
                             .id(transaction.getId())
                             .type(transaction.getType())
                             .amount(transaction.getAmount())
-                            .description(transaction.getDescription())
-                            .createdAt(transaction.getCreatedAt())
+                            .description(
+                                    transaction.getDescription()
+                            )
+                            .createdAt(
+                                    transaction.getCreatedAt()
+                            )
                             .saleId(saleId)
                             .invoiceNumber(invoiceNumber)
                             .build();
+
                 })
                 .toList();
     }
 
     private Customer getCustomer(Long id) {
 
-        return customerRepository.findById(id)
+        return customerRepository
+                .findById(id)
                 .orElseThrow(() ->
                         new RuntimeException(
                                 "Customer not found"
@@ -222,38 +280,98 @@ public class CustomerServiceImpl implements CustomerService {
                 );
     }
 
-    private CustomerResponse toResponse(Customer customer) {
+    private CustomerResponse toResponse(
+            Customer customer
+    ) {
 
         BigDecimal outstanding =
-                calculateOutstanding(customer.getId());
+                calculateOutstanding(
+                        customer.getId()
+                );
 
         return CustomerResponse.builder()
                 .id(customer.getId())
                 .name(customer.getName())
-                .contactNumber(customer.getContactNumber())
+                .contactNumber(
+                        customer.getContactNumber()
+                )
                 .active(customer.getActive())
                 .outstanding(outstanding)
                 .build();
     }
 
-    private BigDecimal calculateOutstanding(Long customerId) {
+    /**
+     * Calculates the customer's actual outstanding balance.
+     *
+     * CREDIT_SALE:
+     *      Increases outstanding.
+     *
+     * PAYMENT:
+     *      Actual money received.
+     *      Decreases outstanding.
+     *
+     * CHEQUE_PAYMENT:
+     *      Cheque has been received but has NOT
+     *      necessarily cleared yet.
+     *      Therefore it has NO effect on outstanding.
+     */
+    private BigDecimal calculateOutstanding(
+            Long customerId
+    ) {
+
         return transactionRepository
                 .findByCustomerId(customerId)
                 .stream()
                 .map(transaction -> {
 
-                    if (transaction.getType()
-                            == CustomerTransactionType.CREDIT_SALE) {
+                    CustomerTransactionType type =
+                            transaction.getType();
+
+                    /*
+                     * Credit sale adds to what
+                     * the customer owes.
+                     */
+                    if (type ==
+                            CustomerTransactionType.CREDIT_SALE) {
 
                         return transaction.getAmount();
                     }
 
-                    return transaction.getAmount().negate();
+                    /*
+                     * Actual payment received
+                     * reduces what the customer owes.
+                     */
+                    if (type ==
+                            CustomerTransactionType.PAYMENT) {
+
+                        return transaction.getAmount()
+                                .negate();
+                    }
+
+                    /*
+                     * Cheque received does NOT reduce
+                     * outstanding until the cheque is
+                     * actually credited.
+                     *
+                     * CHEQUE_PAYMENT is therefore ZERO
+                     * here.
+                     */
+                    if (type ==
+                            CustomerTransactionType.CHEQUE_PAYMENT) {
+
+                        return BigDecimal.ZERO;
+                    }
+
+                    /*
+                     * Safe fallback for any future
+                     * transaction types.
+                     */
+                    return BigDecimal.ZERO;
+
                 })
                 .reduce(
                         BigDecimal.ZERO,
                         BigDecimal::add
                 );
     }
-
 }

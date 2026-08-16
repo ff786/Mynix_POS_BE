@@ -299,25 +299,7 @@ public class CustomerServiceImpl implements CustomerService {
                 .outstanding(outstanding)
                 .build();
     }
-
-    /**
-     * Calculates the customer's actual outstanding balance.
-     *
-     * CREDIT_SALE:
-     *      Increases outstanding.
-     *
-     * PAYMENT:
-     *      Actual money received.
-     *      Decreases outstanding.
-     *
-     * CHEQUE_PAYMENT:
-     *      Cheque has been received but has NOT
-     *      necessarily cleared yet.
-     *      Therefore it has NO effect on outstanding.
-     */
-    private BigDecimal calculateOutstanding(
-            Long customerId
-    ) {
+    private BigDecimal calculateOutstanding(Long customerId) {
 
         return transactionRepository
                 .findByCustomerId(customerId)
@@ -327,35 +309,17 @@ public class CustomerServiceImpl implements CustomerService {
                     CustomerTransactionType type =
                             transaction.getType();
 
-                    /*
-                     * Credit sale adds to what
-                     * the customer owes.
-                     */
                     if (type ==
                             CustomerTransactionType.CREDIT_SALE) {
 
                         return transaction.getAmount();
                     }
-
-                    /*
-                     * Actual payment received
-                     * reduces what the customer owes.
-                     */
                     if (type ==
                             CustomerTransactionType.PAYMENT) {
 
                         return transaction.getAmount()
                                 .negate();
                     }
-
-                    /*
-                     * Cheque received does NOT reduce
-                     * outstanding until the cheque is
-                     * actually credited.
-                     *
-                     * CHEQUE_PAYMENT is therefore ZERO
-                     * here.
-                     */
                     if (type ==
                             CustomerTransactionType.CHEQUE_PAYMENT) {
 

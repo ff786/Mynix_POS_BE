@@ -58,6 +58,12 @@ public class CustomerController {
 
         return customerService.getAll();
     }
+    @GetMapping("/search")
+    public List<CustomerResponse> search(
+            @RequestParam String query
+    ) {
+        return customerService.search(query);
+    }
 
     @GetMapping("/{id}")
     public CustomerResponse getById(

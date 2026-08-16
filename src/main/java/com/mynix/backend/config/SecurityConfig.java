@@ -111,7 +111,8 @@ public class SecurityConfig {
                 "POST",
                 "PUT",
                 "DELETE",
-                "OPTIONS"
+                "OPTIONS",
+                "PATCH"
         ));
 
         configuration.setAllowedHeaders(List.of("*"));

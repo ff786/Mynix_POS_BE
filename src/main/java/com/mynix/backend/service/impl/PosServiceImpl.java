@@ -48,8 +48,16 @@ public class PosServiceImpl implements PosService {
         // Validate customer/payment combination
         Customer customer = null;
 
-        if (request.getCustomerId() != null) {
+        if (request.getPaymentMethod() == PaymentMethod.CREDIT
+                || request.getPaymentMethod() == PaymentMethod.CHEQUE) {
 
+            if (request.getCustomerId() == null) {
+                throw new RuntimeException(
+                        "Customer is required for "
+                                + request.getPaymentMethod()
+                                + " sales."
+                );
+            }
             customer = customerRepository
                     .findById(request.getCustomerId())
                     .orElseThrow(() ->
@@ -57,19 +65,11 @@ public class PosServiceImpl implements PosService {
                                     "Customer not found."
                             )
                     );
-
             if (!customer.getActive()) {
                 throw new RuntimeException(
                         "Customer is inactive."
                 );
             }
-        }
-        // CREDIT sales MUST have a customer.
-        if (request.getPaymentMethod() == PaymentMethod.CREDIT
-                && customer == null) {
-            throw new RuntimeException(
-                    "A customer is required for credit sales."
-            );
         }
 
         // Calculate subtotal and build sale items
@@ -126,8 +126,8 @@ public class PosServiceImpl implements PosService {
             .invoiceNumber(invoiceNumberGenerator.generate())
             .publicInvoiceToken(
                     UUID.randomUUID()
-                        .toString()
-                        .replace("-", "")
+                            .toString()
+                            .replace("-", "")
             )
             .subtotal(subtotal)
             .discount(discount)
@@ -158,7 +158,9 @@ public class PosServiceImpl implements PosService {
                     CustomerTransaction.builder()
                             .customer(customer)
                             .sale(sale)
-                            .type(CustomerTransactionType.CREDIT_SALE)
+                            .type(
+                                    CustomerTransactionType.CREDIT_SALE
+                            )
                             .amount(grandTotal)
                             .description(
                                     "Credit sale - "
@@ -166,53 +168,76 @@ public class PosServiceImpl implements PosService {
                             )
                             .build();
 
-            customerTransactionRepository.save(transaction);
+            customerTransactionRepository.save(
+                    transaction
+            );
 
-        } else if (request.getPaymentMethod() == PaymentMethod.CHEQUE) {
-
-            if (customer == null) {
-                throw new RuntimeException(
-                        "Customer is required for cheque payment."
-                );
-            }
+        } else if (
+                request.getPaymentMethod() ==
+                        PaymentMethod.CHEQUE
+        ) {
 
             /*
-             * Create the cheque automatically when the sale is completed.
-             *
-             * Initial status:
-             * RECEIVED
-             *
-             * The cheque can later be:
-             * RECEIVED -> DEPOSITED -> CREDITED
-             *                     -> BOUNCED
+             * 1. The cheque sale is an outstanding
+             *    customer receivable.
              */
+            CustomerTransaction creditSale =
+                    CustomerTransaction.builder()
+                            .customer(customer)
+                            .sale(sale)
+                            .type(
+                                    CustomerTransactionType.CREDIT_SALE
+                            )
+                            .amount(grandTotal)
+                            .description(
+                                    "Cheque sale - "
+                                            + sale.getInvoiceNumber()
+                            )
+                            .build();
 
-            Cheque cheque = Cheque.builder()
-                    .customer(customer)
-                    .amount(grandTotal)
-                    .chequeNumber(
-                            "CHQ-" + sale.getInvoiceNumber()
-                    )
-                    .chequeDate(LocalDate.now())
-                    .receivedDate(LocalDate.now())
-                    .status(ChequeStatus.RECEIVED)
-                    .notes(
-                            "Cheque received for invoice "
-                                    + sale.getInvoiceNumber()
-                    )
-                    .build();
+            customerTransactionRepository.save(
+                    creditSale
+            );
+
+            /*
+             * 2. Create the cheque tracking record.
+             *
+             * This does NOT reduce outstanding.
+             */
+            Cheque cheque =
+                    Cheque.builder()
+                            .customer(customer)
+                            .amount(grandTotal)
+                            .chequeNumber(
+                                    "CHQ-" +
+                                            sale.getInvoiceNumber()
+                            )
+                            .chequeDate(
+                                    LocalDate.now()
+                            )
+                            .receivedDate(
+                                    LocalDate.now()
+                            )
+                            .status(
+                                    ChequeStatus.RECEIVED
+                            )
+                            .notes(
+                                    "Cheque received for invoice "
+                                            + sale.getInvoiceNumber()
+                            )
+                            .build();
 
             chequeRepository.save(cheque);
 
             /*
-             * Keep the cheque transaction in the customer ledger.
+             * 3. Track the cheque activity in the
+             *    customer transaction history.
              *
-             * CHEQUE_PAYMENT itself does NOT reduce outstanding.
-             * Outstanding is reduced only when the cheque
-             * becomes CREDITED.
+             * IMPORTANT:
+             * CHEQUE_PAYMENT has ZERO effect on
+             * customer outstanding.
              */
-
-            CustomerTransaction transaction =
+            CustomerTransaction chequeTransaction =
                     CustomerTransaction.builder()
                             .customer(customer)
                             .sale(sale)
@@ -226,7 +251,9 @@ public class PosServiceImpl implements PosService {
                             )
                             .build();
 
-            customerTransactionRepository.save(transaction);
+            customerTransactionRepository.save(
+                    chequeTransaction
+            );
         }
 
         // Calculate current customer outstanding

@@ -12,7 +12,10 @@ public class CheckoutResponse {
     private String invoiceNumber;
     private BigDecimal subtotal;
     private BigDecimal discount;
+    private BigDecimal deliveryFee;
     private BigDecimal grandTotal;
     private String paymentMethod;
-    private BigDecimal deliveryFee;
+    private Long customerId;
+    private String customerName;
+    private BigDecimal customerOutstanding;
 }

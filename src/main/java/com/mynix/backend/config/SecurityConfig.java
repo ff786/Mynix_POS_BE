@@ -61,6 +61,10 @@ public class SecurityConfig {
                         ).permitAll()
 
                         .requestMatchers(
+                                "/api/public/invoices/**"
+                        ).permitAll()
+
+                        .requestMatchers(
                                 "/api/users/**"
                         ).hasRole("ADMIN")
 
@@ -72,7 +76,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/dashboard/**",
                                 "/api/sales/**",
-                                "/api/pos/**"
+                                "/api/pos/**",
+                                "/api/public/invoices/**"
                         ).hasAnyRole(
                                 "ADMIN",
                                 "CASHIER"

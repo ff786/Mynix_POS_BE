@@ -17,6 +17,8 @@ public class CheckoutRequest {
     @NotEmpty
     private List<CheckoutItem> items;
 
+    private Long customerId;
+
     @NotNull
     private PaymentMethod paymentMethod;
 

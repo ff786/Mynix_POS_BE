@@ -11,6 +11,7 @@ import java.util.Optional;
 public interface SaleRepository extends JpaRepository<Sale, Long> {
 
     Optional<Sale> findByInvoiceNumber(String invoiceNumber);
+    Optional<Sale> findByPublicInvoiceToken(String publicInvoiceToken);
 
     @Query("""
     SELECT COALESCE(SUM(s.grandTotal),0)

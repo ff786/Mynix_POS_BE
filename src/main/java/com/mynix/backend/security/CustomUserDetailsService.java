@@ -27,7 +27,6 @@ public class CustomUserDetailsService implements UserDetailsService {
                                 "User not found"
                         )
                 );
-
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.getUsername())
                 .password(user.getPasswordHash())

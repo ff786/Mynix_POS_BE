@@ -20,6 +20,11 @@ public class SaleResponse {
     private PaymentMethod paymentMethod;
     private LocalDateTime createdAt;
     private BigDecimal deliveryFee;
+    // Customer information
+    private Long customerId;
+    private String customerName;
+    private String customerContactNumber;
+    private BigDecimal customerOutstanding;
 
     private List<SaleItemResponse> items;
 

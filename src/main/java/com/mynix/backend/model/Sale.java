@@ -32,15 +32,32 @@ public class Sale {
     private BigDecimal discount = BigDecimal.ZERO;
 
     @Builder.Default
-    @Column(name = "delivery_fee", nullable = false, precision = 12, scale = 2)
+    @Column(
+            name = "delivery_fee",
+            nullable = false,
+            precision = 12,
+            scale = 2
+    )
     private BigDecimal deliveryFee = BigDecimal.ZERO;
 
-    @Column(name = "grand_total", nullable = false, precision = 12, scale = 2)
+    @Column(
+            name = "grand_total",
+            nullable = false,
+            precision = 12,
+            scale = 2
+    )
     private BigDecimal grandTotal;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "payment_method", nullable = false)
     private PaymentMethod paymentMethod;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id")
+    private Customer customer;
+
+    @Column(name = "public_invoice_token", unique = true, length = 64)
+    private String publicInvoiceToken;
 
     @Builder.Default
     @Column(name = "created_at", nullable = false)

@@ -42,12 +42,8 @@ public class PosServiceImpl implements PosService {
         // Validate customer/payment combination
         Customer customer = null;
 
-        if (request.getPaymentMethod() == PaymentMethod.CREDIT) {
-            if (request.getCustomerId() == null) {
-                throw new RuntimeException(
-                        "Customer is required for credit sales."
-                );
-            }
+        if (request.getCustomerId() != null) {
+
             customer = customerRepository
                     .findById(request.getCustomerId())
                     .orElseThrow(() ->
@@ -55,17 +51,19 @@ public class PosServiceImpl implements PosService {
                                     "Customer not found."
                             )
                     );
-            if (!customer.getActive()) {
 
+            if (!customer.getActive()) {
                 throw new RuntimeException(
                         "Customer is inactive."
                 );
             }
         }
-
         // CREDIT sales MUST have a customer.
-        if (request.getPaymentMethod() == PaymentMethod.CREDIT && customer == null) {
-            throw new RuntimeException("A customer is required for credit sales.");
+        if (request.getPaymentMethod() == PaymentMethod.CREDIT
+                && customer == null) {
+            throw new RuntimeException(
+                    "A customer is required for credit sales."
+            );
         }
 
         // Calculate subtotal and build sale items
@@ -130,6 +128,7 @@ public class PosServiceImpl implements PosService {
             .deliveryFee(deliveryFee)
             .grandTotal(grandTotal)
             .paymentMethod(request.getPaymentMethod())
+            .customer(customer)
             .build();
 
         for (SaleItem item : saleItems) {

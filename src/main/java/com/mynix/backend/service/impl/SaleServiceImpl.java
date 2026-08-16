@@ -87,10 +87,26 @@ public class SaleServiceImpl implements SaleService {
     }
 
     private BigDecimal transactionAmount(CustomerTransaction transaction) {
-        if (transaction.getType() == CustomerTransactionType.CREDIT_SALE) {
+        if (transaction.getType()
+                == CustomerTransactionType.CREDIT_SALE) {
+
             return transaction.getAmount();
+
         }
 
-        return transaction.getAmount().negate();
+        if (transaction.getType()
+                == CustomerTransactionType.PAYMENT) {
+
+            return transaction.getAmount().negate();
+
+        }
+
+        /*
+         * CHEQUE_PAYMENT means the cheque has been received,
+         * but the bank has NOT credited it yet.
+         *
+         * Therefore it does not change outstanding.
+         */
+        return BigDecimal.ZERO;
     }
 }

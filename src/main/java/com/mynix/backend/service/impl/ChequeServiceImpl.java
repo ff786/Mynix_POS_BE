@@ -123,10 +123,43 @@ public class ChequeServiceImpl implements ChequeService {
                                 )
                         );
 
+        ChequeStatus currentStatus =
+                cheque.getStatus();
+
         ChequeStatus newStatus =
                 request.getStatus();
 
+        /*
+         * Already credited = final state.
+         */
+        if (currentStatus == ChequeStatus.CREDITED) {
+
+            throw new RuntimeException(
+                    "A credited cheque cannot be changed."
+            );
+        }
+
+        /*
+         * Already bounced = final state.
+         */
+        if (currentStatus == ChequeStatus.BOUNCED) {
+
+            throw new RuntimeException(
+                    "A bounced cheque cannot be changed."
+            );
+        }
+
+        /*
+         * RECEIVED -> DEPOSITED
+         */
         if (newStatus == ChequeStatus.DEPOSITED) {
+
+            if (currentStatus != ChequeStatus.RECEIVED) {
+
+                throw new RuntimeException(
+                        "Only a received cheque can be deposited."
+                );
+            }
 
             cheque.setDepositDate(
                     request.getDepositDate() != null
@@ -135,41 +168,75 @@ public class ChequeServiceImpl implements ChequeService {
             );
         }
 
+        /*
+         * RECEIVED/DEPOSITED -> CREDITED
+         */
+        if (newStatus == ChequeStatus.CREDITED) {
+
+            if (currentStatus != ChequeStatus.RECEIVED &&
+                    currentStatus != ChequeStatus.DEPOSITED) {
+
+                throw new RuntimeException(
+                        "Only a received or deposited cheque can be credited."
+                );
+            }
+
+            cheque.setBounceReason(null);
+
+            CustomerTransaction transaction =
+                    CustomerTransaction.builder()
+                            .customer(cheque.getCustomer())
+                            .type(CustomerTransactionType.PAYMENT)
+                            .amount(cheque.getAmount())
+                            .description(
+                                    "Cheque credited - "
+                                            + cheque.getChequeNumber()
+                            )
+                            .build();
+
+            transactionRepository.save(transaction);
+        }
+
+        /*
+         * RECEIVED/DEPOSITED -> BOUNCED
+         */
         if (newStatus == ChequeStatus.BOUNCED) {
+
+            if (currentStatus != ChequeStatus.RECEIVED &&
+                    currentStatus != ChequeStatus.DEPOSITED) {
+
+                throw new RuntimeException(
+                        "Only a received or deposited cheque can be bounced."
+                );
+            }
 
             if (request.getBounceReason() == null ||
                     request.getBounceReason().isBlank()) {
-                throw new RuntimeException("Bounce reason is required.");
+
+                throw new RuntimeException(
+                        "Bounce reason is required."
+                );
             }
-            cheque.setBounceReason(request.getBounceReason().trim());
+
+            cheque.setBounceReason(
+                    request.getBounceReason().trim()
+            );
         }
 
-        if (newStatus == ChequeStatus.CREDITED) {
-            if (cheque.getStatus() == ChequeStatus.CREDITED) {
-                throw new RuntimeException("Cheque has already been credited.");
-            }
+        /*
+         * Don't allow arbitrary status changes.
+         */
+        if (newStatus == ChequeStatus.RECEIVED) {
 
-            if (cheque.getStatus() == ChequeStatus.BOUNCED) {
-                throw new RuntimeException("A bounced cheque cannot be credited.");
-            }
-            cheque.setBounceReason(null);
-
-            CustomerTransaction transaction = CustomerTransaction.builder()
-                .customer(cheque.getCustomer())
-                .type(CustomerTransactionType.PAYMENT)
-                .amount(cheque.getAmount())
-                .description(
-                        "Cheque payment credited - "
-                                + cheque.getChequeNumber()
-                )
-                .build();
-
-            transactionRepository.save(transaction);
+            throw new RuntimeException(
+                    "A cheque cannot be changed back to RECEIVED."
+            );
         }
 
         cheque.setStatus(newStatus);
 
         if (request.getNotes() != null) {
+
             cheque.setNotes(
                     request.getNotes().trim()
             );

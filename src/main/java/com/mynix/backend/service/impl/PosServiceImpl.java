@@ -17,6 +17,11 @@ import com.mynix.backend.repository.ProductRepository;
 import com.mynix.backend.repository.SaleRepository;
 import com.mynix.backend.service.PosService;
 import com.mynix.backend.util.InvoiceNumberGenerator;
+import com.mynix.backend.model.Cheque;
+import com.mynix.backend.model.ChequeStatus;
+import com.mynix.backend.repository.ChequeRepository;
+
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +39,7 @@ public class PosServiceImpl implements PosService {
     private final SaleRepository saleRepository;
     private final CustomerRepository customerRepository;
     private final CustomerTransactionRepository customerTransactionRepository;
+    private final ChequeRepository chequeRepository;
     private final InvoiceNumberGenerator invoiceNumberGenerator;
 
     @Override
@@ -145,7 +151,7 @@ public class PosServiceImpl implements PosService {
             productRepository.save(product);
         }
 
-        // CREDIT SALE
+        // CREDIT SALE & CHEQUE PAYMENT TRANSACTIONS
         if (request.getPaymentMethod() == PaymentMethod.CREDIT) {
 
             CustomerTransaction transaction =
@@ -154,8 +160,72 @@ public class PosServiceImpl implements PosService {
                             .sale(sale)
                             .type(CustomerTransactionType.CREDIT_SALE)
                             .amount(grandTotal)
-                            .description("Credit sale - " + sale.getInvoiceNumber())
+                            .description(
+                                    "Credit sale - "
+                                            + sale.getInvoiceNumber()
+                            )
                             .build();
+
+            customerTransactionRepository.save(transaction);
+
+        } else if (request.getPaymentMethod() == PaymentMethod.CHEQUE) {
+
+            if (customer == null) {
+                throw new RuntimeException(
+                        "Customer is required for cheque payment."
+                );
+            }
+
+            /*
+             * Create the cheque automatically when the sale is completed.
+             *
+             * Initial status:
+             * RECEIVED
+             *
+             * The cheque can later be:
+             * RECEIVED -> DEPOSITED -> CREDITED
+             *                     -> BOUNCED
+             */
+
+            Cheque cheque = Cheque.builder()
+                    .customer(customer)
+                    .amount(grandTotal)
+                    .chequeNumber(
+                            "CHQ-" + sale.getInvoiceNumber()
+                    )
+                    .chequeDate(LocalDate.now())
+                    .receivedDate(LocalDate.now())
+                    .status(ChequeStatus.RECEIVED)
+                    .notes(
+                            "Cheque received for invoice "
+                                    + sale.getInvoiceNumber()
+                    )
+                    .build();
+
+            chequeRepository.save(cheque);
+
+            /*
+             * Keep the cheque transaction in the customer ledger.
+             *
+             * CHEQUE_PAYMENT itself does NOT reduce outstanding.
+             * Outstanding is reduced only when the cheque
+             * becomes CREDITED.
+             */
+
+            CustomerTransaction transaction =
+                    CustomerTransaction.builder()
+                            .customer(customer)
+                            .sale(sale)
+                            .type(
+                                    CustomerTransactionType.CHEQUE_PAYMENT
+                            )
+                            .amount(grandTotal)
+                            .description(
+                                    "Cheque received - "
+                                            + sale.getInvoiceNumber()
+                            )
+                            .build();
+
             customerTransactionRepository.save(transaction);
         }
 

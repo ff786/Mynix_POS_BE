@@ -11,6 +11,7 @@ import com.mynix.backend.model.PaymentMethod;
 import com.mynix.backend.repository.CustomerRepository;
 import com.mynix.backend.repository.CustomerTransactionRepository;
 import com.mynix.backend.service.CustomerService;
+import com.mynix.backend.dto.customer.CustomerTransactionResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -174,6 +175,41 @@ public class CustomerServiceImpl implements CustomerService {
                 .remainingOutstanding(remainingOutstanding)
                 .description(transaction.getDescription())
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CustomerTransactionResponse> getTransactions(
+            Long customerId
+    ) {
+
+        getCustomer(customerId);
+
+        return transactionRepository
+                .findByCustomerIdOrderByCreatedAtDesc(customerId)
+                .stream()
+                .map(transaction -> {
+
+                    Long saleId = null;
+                    String invoiceNumber = null;
+
+                    if (transaction.getSale() != null) {
+                        saleId = transaction.getSale().getId();
+                        invoiceNumber =
+                                transaction.getSale().getInvoiceNumber();
+                    }
+
+                    return CustomerTransactionResponse.builder()
+                            .id(transaction.getId())
+                            .type(transaction.getType())
+                            .amount(transaction.getAmount())
+                            .description(transaction.getDescription())
+                            .createdAt(transaction.getCreatedAt())
+                            .saleId(saleId)
+                            .invoiceNumber(invoiceNumber)
+                            .build();
+                })
+                .toList();
     }
 
     private Customer getCustomer(Long id) {

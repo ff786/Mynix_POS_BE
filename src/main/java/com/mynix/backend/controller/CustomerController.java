@@ -1,9 +1,6 @@
 package com.mynix.backend.controller;
 
-import com.mynix.backend.dto.customer.CustomerRequest;
-import com.mynix.backend.dto.customer.CustomerResponse;
-import com.mynix.backend.dto.customer.PaymentRequest;
-import com.mynix.backend.dto.customer.PaymentResponse;
+import com.mynix.backend.dto.customer.*;
 import com.mynix.backend.service.CustomerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +35,12 @@ public class CustomerController {
                 request
         );
     }
+    @GetMapping("/{id}/transactions")
+    public List<CustomerTransactionResponse> getTransactions(
+            @PathVariable Long id
+    ) {
+        return customerService.getTransactions(id);
+    }
 
     @PutMapping("/{id}")
     public CustomerResponse update(
@@ -64,6 +67,7 @@ public class CustomerController {
     ) {
         return customerService.search(query);
     }
+
 
     @GetMapping("/{id}")
     public CustomerResponse getById(

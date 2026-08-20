@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +31,14 @@ public class PublicInvoiceServiceImpl
                 .orElseThrow(() ->
                         new RuntimeException("Invoice not found.")
                 );
+
+        if (sale.getPublicInvoiceExpiresAt() == null ||
+                sale.getPublicInvoiceExpiresAt()
+                        .isBefore(LocalDateTime.now())) {
+            throw new RuntimeException(
+                    "This invoice link has expired."
+            );
+        }
 
         BigDecimal outstanding = BigDecimal.ZERO;
 

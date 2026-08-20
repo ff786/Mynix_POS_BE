@@ -17,9 +17,19 @@ spring:
   flyway:
     enabled: true
 
+textlk:
+  api-url: ${TEXTLK_API_URL:https://app.text.lk/api/v3/sms/send}
+  api-token: ${TEXTLK_API_TOKEN:6822|R1M0unfzMt0YLcV0Tnt6W4fmnr3nQ56FufyLhBoK445f0189}
+#Actual API Token related to Sender ID
+#  sender-id: ${TEXTLK_SENDER_ID:MYNIX}
+  #Temporary Sender ID for testing purposes
+  sender-id: ${TEXTLK_SENDER_ID:TextLKDemo}
+
 jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:86400000}
 
 server:
   port: ${PORT:8080}
+
+

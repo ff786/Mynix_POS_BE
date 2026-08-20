@@ -59,6 +59,9 @@ public class Sale {
     @Column(name = "public_invoice_token", unique = true, length = 64)
     private String publicInvoiceToken;
 
+    @Column(name = "public_invoice_expires_at")
+    private LocalDateTime publicInvoiceExpiresAt;
+
     @Builder.Default
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();

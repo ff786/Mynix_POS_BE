@@ -4,32 +4,20 @@ import com.mynix.backend.dto.checkout.CheckoutItem;
 import com.mynix.backend.dto.checkout.CheckoutRequest;
 import com.mynix.backend.dto.checkout.CheckoutResponse;
 import com.mynix.backend.dto.pos.PosProductResponse;
-import com.mynix.backend.model.Customer;
-import com.mynix.backend.model.CustomerTransaction;
-import com.mynix.backend.model.CustomerTransactionType;
-import com.mynix.backend.model.PaymentMethod;
-import com.mynix.backend.repository.CustomerRepository;
-import com.mynix.backend.repository.CustomerTransactionRepository;
-import com.mynix.backend.model.Product;
-import com.mynix.backend.model.Sale;
-import com.mynix.backend.model.SaleItem;
-import com.mynix.backend.repository.ProductRepository;
-import com.mynix.backend.repository.SaleRepository;
+import com.mynix.backend.model.*;
+import com.mynix.backend.repository.*;
 import com.mynix.backend.service.PosService;
 import com.mynix.backend.util.InvoiceNumberGenerator;
-import com.mynix.backend.model.Cheque;
-import com.mynix.backend.model.ChequeStatus;
-import com.mynix.backend.repository.ChequeRepository;
-
-import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.UUID;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -128,6 +116,9 @@ public class PosServiceImpl implements PosService {
                     UUID.randomUUID()
                             .toString()
                             .replace("-", "")
+            )
+            .publicInvoiceExpiresAt(
+                    LocalDateTime.now().plusDays(3)
             )
             .subtotal(subtotal)
             .discount(discount)

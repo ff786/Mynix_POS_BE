@@ -25,8 +25,6 @@ public class SmsTestController {
 
                 Your SMS integration is now working.
                 
-                Helloo Motherfucker
-
                 Thank you for choosing MYNIX.
                 """
         );

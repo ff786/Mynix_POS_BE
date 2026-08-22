@@ -1,10 +1,6 @@
 package com.mynix.backend.service.impl;
 
-import com.mynix.backend.dto.customer.CustomerRequest;
-import com.mynix.backend.dto.customer.CustomerResponse;
-import com.mynix.backend.dto.customer.PaymentRequest;
-import com.mynix.backend.dto.customer.PaymentResponse;
-import com.mynix.backend.dto.customer.CustomerTransactionResponse;
+import com.mynix.backend.dto.customer.*;
 import com.mynix.backend.model.Customer;
 import com.mynix.backend.model.CustomerTransaction;
 import com.mynix.backend.model.CustomerTransactionType;
@@ -12,6 +8,7 @@ import com.mynix.backend.model.PaymentMethod;
 import com.mynix.backend.repository.CustomerRepository;
 import com.mynix.backend.repository.CustomerTransactionRepository;
 import com.mynix.backend.service.CustomerService;
+import com.mynix.backend.service.SmsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +23,8 @@ public class CustomerServiceImpl implements CustomerService {
 
     private final CustomerRepository customerRepository;
     private final CustomerTransactionRepository transactionRepository;
+
+    private final SmsService smsService;
 
     @Override
     public CustomerResponse create(CustomerRequest request) {
@@ -199,27 +198,34 @@ public class CustomerServiceImpl implements CustomerService {
         transactionRepository.save(transaction);
 
         BigDecimal remainingOutstanding =
-                previousOutstanding.subtract(
-                        paymentAmount
-                );
+            previousOutstanding.subtract(
+                    paymentAmount
+            );
+
+        smsService.sendPaymentSms(
+                customer,
+                paymentAmount,
+                request.getPaymentMethod(),
+                remainingOutstanding
+        );
 
         return PaymentResponse.builder()
-                .customerId(customer.getId())
-                .customerName(customer.getName())
-                .paymentAmount(paymentAmount)
-                .paymentMethod(
-                        request.getPaymentMethod().name()
-                )
-                .previousOutstanding(
-                        previousOutstanding
-                )
-                .remainingOutstanding(
-                        remainingOutstanding
-                )
-                .description(
-                        transaction.getDescription()
-                )
-                .build();
+            .customerId(customer.getId())
+            .customerName(customer.getName())
+            .paymentAmount(paymentAmount)
+            .paymentMethod(
+                    request.getPaymentMethod().name()
+            )
+            .previousOutstanding(
+                    previousOutstanding
+            )
+            .remainingOutstanding(
+                    remainingOutstanding
+            )
+            .description(
+                    transaction.getDescription()
+            )
+            .build();
     }
 
     @Override

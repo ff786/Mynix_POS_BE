@@ -20,10 +20,12 @@ spring:
 textlk:
   api-url: ${TEXTLK_API_URL:https://app.text.lk/api/v3/sms/send}
   api-token: ${TEXTLK_API_TOKEN:6822|R1M0unfzMt0YLcV0Tnt6W4fmnr3nQ56FufyLhBoK445f0189}
-#Actual API Token related to Sender ID
-#  sender-id: ${TEXTLK_SENDER_ID:MYNIX}
-  #Temporary Sender ID for testing purposes
-  sender-id: ${TEXTLK_SENDER_ID:TextLKDemo}
+  sender-id: ${TEXTLK_SENDER_ID:MYNIX} #Actual API Token related to Sender ID
+#sender-id: ${TEXTLK_SENDER_ID:TextLKDemo}  #Temporary Sender ID for testing purposes
+
+mynix:
+  public-invoice-base-url: ${MYNIX_PUBLIC_INVOICE_BASE_URL:http://localhost:5173/invoice}
+  sms-enabled: ${MYNIX_SMS_ENABLED:true}
 
 jwt:
   secret: ${JWT_SECRET}

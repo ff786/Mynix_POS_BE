@@ -7,6 +7,7 @@ import com.mynix.backend.dto.pos.PosProductResponse;
 import com.mynix.backend.model.*;
 import com.mynix.backend.repository.*;
 import com.mynix.backend.service.PosService;
+import com.mynix.backend.service.SmsService;
 import com.mynix.backend.util.InvoiceNumberGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,22 +31,16 @@ public class PosServiceImpl implements PosService {
     private final ChequeRepository chequeRepository;
     private final InvoiceNumberGenerator invoiceNumberGenerator;
 
+    private final SmsService smsService;
+
     @Override
     @Transactional
     public CheckoutResponse checkout(CheckoutRequest request) {
         // Validate customer/payment combination
         Customer customer = null;
 
-        if (request.getPaymentMethod() == PaymentMethod.CREDIT
-                || request.getPaymentMethod() == PaymentMethod.CHEQUE) {
+        if (request.getCustomerId() != null) {
 
-            if (request.getCustomerId() == null) {
-                throw new RuntimeException(
-                        "Customer is required for "
-                                + request.getPaymentMethod()
-                                + " sales."
-                );
-            }
             customer = customerRepository
                     .findById(request.getCustomerId())
                     .orElseThrow(() ->
@@ -53,11 +48,28 @@ public class PosServiceImpl implements PosService {
                                     "Customer not found."
                             )
                     );
+
             if (!customer.getActive()) {
+
                 throw new RuntimeException(
                         "Customer is inactive."
                 );
             }
+        }
+        if (request.getPaymentMethod() == PaymentMethod.CREDIT
+                && customer == null) {
+
+            throw new RuntimeException(
+                    "Customer is required for credit sales."
+            );
+        }
+
+        if (request.getPaymentMethod() == PaymentMethod.CHEQUE
+                && customer == null) {
+
+            throw new RuntimeException(
+                    "Customer is required for cheque sales."
+            );
         }
 
         // Calculate subtotal and build sale items
@@ -252,6 +264,22 @@ public class PosServiceImpl implements PosService {
 
         if (customer != null) {
             customerOutstanding = calculateOutstanding(customer.getId());
+        }
+
+        BigDecimal finalCustomerOutstanding =
+                customerOutstanding;
+
+        if (customer != null &&
+                customer.getContactNumber() != null &&
+                !customer.getContactNumber().isBlank() &&
+                sale.getPublicInvoiceToken() != null &&
+                !sale.getPublicInvoiceToken().isBlank()) {
+
+            smsService.sendInvoiceSms(
+                    customer,
+                    sale,
+                    finalCustomerOutstanding
+            );
         }
 
         // Return response

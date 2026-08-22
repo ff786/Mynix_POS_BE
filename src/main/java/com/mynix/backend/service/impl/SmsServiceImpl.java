@@ -1,15 +1,19 @@
 package com.mynix.backend.service.impl;
 
+import com.mynix.backend.model.Customer;
+import com.mynix.backend.model.PaymentMethod;
+import com.mynix.backend.model.Sale;
 import com.mynix.backend.service.SmsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Service
@@ -17,125 +21,413 @@ import java.util.Map;
 @Slf4j
 public class SmsServiceImpl implements SmsService {
 
+    private final RestClient restClient;
+
     @Value("${textlk.api-url}")
     private String apiUrl;
 
     @Value("${textlk.api-token}")
     private String apiToken;
 
-    @Value("${textlk.sender-id}")
+    @Value("${textlk.sender-id:MYNIX}")
     private String senderId;
 
-    private final RestClient restClient;
+    @Value("${mynix.public-invoice-base-url}")
+    private String publicInvoiceBaseUrl;
+
+    @Value("${mynix.sms-enabled:true}")
+    private boolean smsEnabled;
 
 
     @Override
     public void sendSms(
-            String phoneNumber,
+            String recipient,
             String message
     ) {
 
-        if (phoneNumber == null || phoneNumber.isBlank()) {
-            log.warn("SMS skipped: customer has no phone number.");
+        if (!smsEnabled) {
+            log.info(
+                    "MYNIX SMS disabled. Message not sent to {}.",
+                    recipient
+            );
+            return;
+        }
+
+        if (recipient == null || recipient.isBlank()) {
+            log.warn(
+                    "SMS skipped because recipient number is empty."
+            );
             return;
         }
 
         if (message == null || message.isBlank()) {
-            log.warn("SMS skipped: message is empty.");
+            log.warn(
+                    "SMS skipped because message is empty."
+            );
             return;
         }
 
-        String recipient =
-                normalizeSriLankanNumber(phoneNumber);
+
+        String normalizedRecipient =
+                normalizeSriLankanNumber(recipient);
+
+        if (normalizedRecipient == null) {
+            log.warn(
+                    "SMS skipped because phone number could not be normalized: {}",
+                    recipient
+            );
+            return;
+        }
+
+
+        Map<String, Object> payload =
+                new LinkedHashMap<>();
+
+        payload.put(
+                "recipient",
+                normalizedRecipient
+        );
+
+        payload.put(
+                "sender_id",
+                senderId
+        );
+
+        payload.put(
+                "type",
+                "plain"
+        );
+
+        payload.put(
+                "message",
+                message
+        );
+
 
         try {
 
-            Map<String, Object> request =
-                    Map.of(
-                            "recipient", recipient,
-                            "sender_id", senderId,
-                            "type", "plain",
-                            "message", message
-                    );
-
             log.info(
-                    "Sending SMS to {} using sender ID {}",
-                    recipient,
+                    "Sending MYNIX SMS to {} using sender ID {}",
+                    normalizedRecipient,
                     senderId
             );
 
-            ResponseEntity<String> response =
+
+            Map<String, Object> response =
                     restClient
                             .post()
                             .uri(apiUrl)
                             .header(
-                                    HttpHeaders.AUTHORIZATION,
+                                    "Authorization",
                                     "Bearer " + apiToken
                             )
-                            .header(
-                                    HttpHeaders.CONTENT_TYPE,
-                                    MediaType.APPLICATION_JSON_VALUE
+                            .contentType(
+                                    MediaType.APPLICATION_JSON
                             )
-                            .header(
-                                    HttpHeaders.ACCEPT,
-                                    MediaType.APPLICATION_JSON_VALUE
+                            .accept(
+                                    MediaType.APPLICATION_JSON
                             )
-                            .body(request)
+                            .body(payload)
                             .retrieve()
-                            .toEntity(String.class);
+                            .body(
+                                    new ParameterizedTypeReference<>() {}
+                            );
+
 
             log.info(
-                    "Text.lk HTTP Status: {}",
-                    response.getStatusCode()
+                    "Text.lk response: {}",
+                    response
             );
 
-            log.info(
-                    "Text.lk Response: {}",
-                    response.getBody()
-            );
+
+            if (response == null ||
+                    response.isEmpty()) {
+
+                log.error(
+                        "Text.lk returned an empty response."
+                );
+
+                return;
+            }
+
+
+            Object status =
+                    response.get("status");
+
+
+            if ("success".equalsIgnoreCase(
+                    String.valueOf(status)
+            )) {
+
+                log.info(
+                        "MYNIX SMS accepted by Text.lk for {}.",
+                        normalizedRecipient
+                );
+
+            } else {
+
+                log.error(
+                        "Text.lk rejected MYNIX SMS. Response: {}",
+                        response
+                );
+            }
+
 
         } catch (Exception e) {
 
+            /*
+             * SMS failure must never cancel
+             * a successful sale or payment.
+             */
             log.error(
-                    "TEXT.LK SMS FAILED for {}",
-                    recipient,
-                    e
-            );
-
-            // TEMPORARY:
-            // expose the actual provider failure
-            // while we are testing the integration.
-            throw new RuntimeException(
-                    "Text.lk SMS failed: " + e.getMessage(),
+                    "MYNIX SMS sending failed for {}.",
+                    normalizedRecipient,
                     e
             );
         }
     }
 
-    private String normalizeSriLankanNumber(
-            String phoneNumber
+
+    @Override
+    public void sendInvoiceSms(
+            Customer customer,
+            Sale sale,
+            BigDecimal outstanding
     ) {
 
+        if (customer == null || sale == null) {
+            return;
+        }
+
+
         String phone =
-                phoneNumber
+                customer.getContactNumber();
+
+
+        if (phone == null || phone.isBlank()) {
+
+            log.warn(
+                    "Invoice SMS skipped for {} because no contact number exists.",
+                    customer.getName()
+            );
+
+            return;
+        }
+
+
+        BigDecimal safeOutstanding =
+                outstanding != null
+                        ? outstanding
+                        : BigDecimal.ZERO;
+
+
+        String invoiceUrl =
+                buildInvoiceUrl(
+                        sale.getPublicInvoiceToken()
+                );
+
+
+        String message =
+                "Dear Customer, Your invoice "
+                        + sale.getInvoiceNumber()
+                        + " total is Rs. "
+                        + formatAmount(
+                        sale.getGrandTotal()
+                )
+                        + " and your total outstanding is Rs. "
+                        + formatAmount(
+                        safeOutstanding
+                )
+                        + ". Thank you for choosing MYNIX. "
+                        + "To view your bill: "
+                        + invoiceUrl
+                        + "\n"
+                        + "Inquiries, 0778843815";
+
+
+        sendSms(
+                phone,
+                message
+        );
+    }
+
+
+    @Override
+    public void sendPaymentSms(
+            Customer customer,
+            BigDecimal paymentAmount,
+            PaymentMethod paymentMethod,
+            BigDecimal remainingOutstanding
+    ) {
+
+        if (customer == null) {
+            return;
+        }
+
+
+        String phone =
+                customer.getContactNumber();
+
+
+        if (phone == null || phone.isBlank()) {
+
+            log.warn(
+                    "Payment SMS skipped for {} because no contact number exists.",
+                    customer.getName()
+            );
+
+            return;
+        }
+
+
+        BigDecimal safePayment =
+                paymentAmount != null
+                        ? paymentAmount
+                        : BigDecimal.ZERO;
+
+
+        BigDecimal safeOutstanding =
+                remainingOutstanding != null
+                        ? remainingOutstanding
+                        : BigDecimal.ZERO;
+
+
+        String paymentType =
+                formatPaymentMethod(
+                        paymentMethod
+                );
+
+
+        String message =
+                "Dear Customer, We have received your payment by "
+                        + paymentType
+                        + " of Rs. "
+                        + formatAmount(
+                        safePayment
+                )
+                        + " and your total outstanding is Rs. "
+                        + formatAmount(
+                        safeOutstanding
+                )
+                        + "\n"
+                        + "Inquiries, 0778843815";
+
+
+        sendSms(
+                phone,
+                message
+        );
+    }
+
+
+    private String buildInvoiceUrl(
+            String token
+    ) {
+
+        if (token == null || token.isBlank()) {
+            return publicInvoiceBaseUrl;
+        }
+
+
+        String base =
+                publicInvoiceBaseUrl
                         .trim()
                         .replaceAll(
-                                "[\\s-()]",
+                                "/+$",
                                 ""
                         );
 
-        if (phone.startsWith("+94")) {
-            return "94" +
-                    phone.substring(3);
+
+        return base + "/" + token;
+    }
+
+
+    private String normalizeSriLankanNumber(
+            String phone
+    ) {
+
+        String value =
+                phone
+                        .trim()
+                        .replaceAll(
+                                "[\\s()-]",
+                                ""
+                        );
+
+
+        if (value.startsWith("+")) {
+            value = value.substring(1);
         }
-        if (phone.startsWith("0094")) {
+
+
+        if (value.startsWith("0")
+                && value.length() == 10) {
+
             return "94" +
-                    phone.substring(4);
+                    value.substring(1);
         }
-        if (phone.startsWith("0")) {
-            return "94" +
-                    phone.substring(1);
+
+
+        if (value.startsWith("94")
+                && value.length() >= 11) {
+
+            return value;
         }
-        return phone;
+
+
+        if (value.startsWith("7")
+                && value.length() == 9) {
+
+            return "94" + value;
+        }
+
+
+        return null;
+    }
+
+
+    private String formatAmount(
+            BigDecimal amount
+    ) {
+
+        if (amount == null) {
+            return "0.00";
+        }
+
+        return amount
+                .setScale(
+                        2,
+                        java.math.RoundingMode.HALF_UP
+                )
+                .toPlainString();
+    }
+
+
+    private String formatPaymentMethod(
+            PaymentMethod method
+    ) {
+
+        if (method == null) {
+            return "Payment";
+        }
+
+
+        return switch (method) {
+
+            case CASH ->
+                    "Cash";
+
+            case CARD ->
+                    "Card";
+
+            case BANK_DEPOSIT ->
+                    "Bank Deposit";
+
+            case CREDIT ->
+                    "Credit";
+
+            case CHEQUE ->
+                    "Cheque";
+        };
     }
 }

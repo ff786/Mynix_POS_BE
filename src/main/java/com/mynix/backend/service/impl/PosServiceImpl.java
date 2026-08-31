@@ -175,10 +175,8 @@ public class PosServiceImpl implements PosService {
                     transaction
             );
 
-        } else if (
-                request.getPaymentMethod() ==
-                        PaymentMethod.CHEQUE
-        ) {
+        } else if (request.getPaymentMethod() == PaymentMethod.CHEQUE)
+        {
 
             /*
              * 1. The cheque sale is an outstanding
@@ -257,6 +255,23 @@ public class PosServiceImpl implements PosService {
             customerTransactionRepository.save(
                     chequeTransaction
             );
+        } else if (customer != null && (request.getPaymentMethod() == PaymentMethod.CASH || request.getPaymentMethod() == PaymentMethod.CARD || request.getPaymentMethod() == PaymentMethod.BANK_DEPOSIT)
+        ) {
+
+            CustomerTransaction transaction =
+                    CustomerTransaction.builder()
+                            .customer(customer)
+                            .sale(sale)
+                            .type(CustomerTransactionType.SALE)
+                            .amount(grandTotal)
+                            .description(
+                                    request.getPaymentMethod().name()
+                                            + " sale - "
+                                            + sale.getInvoiceNumber()
+                            )
+                            .build();
+
+            customerTransactionRepository.save(transaction);
         }
 
         // Calculate current customer outstanding

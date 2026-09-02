@@ -25,4 +25,11 @@ public interface SmsService {
             PaymentMethod paymentMethod,
             BigDecimal remainingOutstanding
     );
+
+    void sendSaleUpdateSms(
+            Customer customer,
+            Sale sale,
+            BigDecimal oldTotal,
+            BigDecimal newTotal
+    );
 }

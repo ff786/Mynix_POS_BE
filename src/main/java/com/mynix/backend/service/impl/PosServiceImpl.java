@@ -10,6 +10,7 @@ import com.mynix.backend.service.PosService;
 import com.mynix.backend.service.SmsService;
 import com.mynix.backend.util.InvoiceNumberGenerator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -138,6 +139,12 @@ public class PosServiceImpl implements PosService {
             .grandTotal(grandTotal)
             .paymentMethod(request.getPaymentMethod())
             .customer(customer)
+            .createdBy(
+                    SecurityContextHolder
+                            .getContext()
+                            .getAuthentication()
+                            .getName()
+            )
             .build();
 
         for (SaleItem item : saleItems) {

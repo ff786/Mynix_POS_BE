@@ -40,29 +40,61 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http)
-            throws Exception {
+    SecurityFilterChain securityFilterChain(
+            HttpSecurity http
+    ) throws Exception {
 
         http
+                /*
+                 * CORS
+                 */
                 .cors(Customizer.withDefaults())
 
+                /*
+                 * JWT API - no CSRF required
+                 */
                 .csrf(AbstractHttpConfigurer::disable)
 
+                /*
+                 * JWT authentication is stateless
+                 */
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
                                 SessionCreationPolicy.STATELESS
                         )
                 )
+
+                /*
+                 * Authorization
+                 */
                 .authorizeHttpRequests(auth -> auth
 
+                        /*
+                         * Allow CORS preflight requests.
+                         * This is important for PUT/DELETE.
+                         */
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.OPTIONS,
+                                "/**"
+                        ).permitAll()
+
+                        /*
+                         * Authentication
+                         */
                         .requestMatchers(
                                 "/api/auth/**"
                         ).permitAll()
 
+                        /*
+                         * Public invoice
+                         */
                         .requestMatchers(
                                 "/api/public/invoices/**"
                         ).permitAll()
 
+                        /*
+                         * Admin only
+                         */
                         .requestMatchers(
                                 "/api/users/**"
                         ).hasRole("ADMIN")
@@ -71,24 +103,37 @@ public class SecurityConfig {
                                 "/api/categories/**"
                         ).hasRole("ADMIN")
 
+                        /*
+                         * POS / Sales / Dashboard
+                         */
                         .requestMatchers(
                                 "/api/dashboard/**",
                                 "/api/products/**",
                                 "/api/sales/**",
-                                "/api/pos/**",
-                                "/api/public/invoices/**"
+                                "/api/pos/**"
                         ).hasAnyRole(
                                 "ADMIN",
                                 "CASHIER"
                         )
 
+                        /*
+                         * Everything else requires authentication
+                         */
                         .anyRequest().authenticated()
                 )
+
+                /*
+                 * JWT filter
+                 */
                 .addFilterBefore(
                         jwtFilter,
                         UsernamePasswordAuthenticationFilter.class
                 )
 
+                /*
+                 * Keep HTTP Basic if your existing
+                 * backend requires it.
+                 */
                 .httpBasic(Customizer.withDefaults());
 
         return http.build();
@@ -100,22 +145,42 @@ public class SecurityConfig {
         CorsConfiguration configuration =
                 new CorsConfiguration();
 
+        /*
+         * Frontend URLs
+         */
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:5173",
+                "http://127.0.0.1:5173",
                 "https://mynix-pos.vercel.app"
         ));
 
+        /*
+         * All methods required by the POS.
+         * PUT and DELETE are explicitly allowed.
+         */
         configuration.setAllowedMethods(List.of(
                 "GET",
                 "POST",
                 "PUT",
+                "PATCH",
                 "DELETE",
-                "OPTIONS",
-                "PATCH"
+                "OPTIONS"
         ));
 
-        configuration.setAllowedHeaders(List.of("*"));
+        /*
+         * JWT + JSON headers
+         */
+        configuration.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "Origin",
+                "X-Requested-With"
+        ));
 
+        /*
+         * Frontend is allowed to send credentials.
+         */
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source =

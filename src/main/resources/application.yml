@@ -1,4 +1,6 @@
 spring:
+  jackson:
+    time-zone: Asia/Colombo
   config:
     import: optional:file:.env[.properties]
 

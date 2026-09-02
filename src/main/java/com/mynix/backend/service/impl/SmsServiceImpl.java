@@ -318,6 +318,58 @@ public class SmsServiceImpl implements SmsService {
                 message
         );
     }
+    @Override
+    public void sendSaleUpdateSms(
+            Customer customer,
+            Sale sale,
+            BigDecimal oldTotal,
+            BigDecimal newTotal
+    ) {
+
+        if (customer == null || sale == null) {
+            return;
+        }
+
+        String phone = customer.getContactNumber();
+
+        if (phone == null || phone.isBlank()) {
+            log.warn(
+                    "Sale update SMS skipped for {} because no contact number exists.",
+                    customer.getName()
+            );
+            return;
+        }
+
+        BigDecimal safeOldTotal =
+                oldTotal != null
+                        ? oldTotal
+                        : BigDecimal.ZERO;
+
+        BigDecimal safeNewTotal =
+                newTotal != null
+                        ? newTotal
+                        : BigDecimal.ZERO;
+
+        String message =
+                "Dear "
+                        + customer.getName()
+                        + ", your MYNIX invoice "
+                        + sale.getInvoiceNumber()
+                        + " has been updated. "
+                        + "Previous total: Rs. "
+                        + formatAmount(safeOldTotal)
+                        + ". New total: Rs. "
+                        + formatAmount(safeNewTotal)
+                        + ". "
+                        + "Please contact us if you have any questions."
+                        + "\n"
+                        + "Inquiries, 0778843815";
+
+        sendSms(
+                phone,
+                message
+        );
+    }
 
 
     private String buildInvoiceUrl(

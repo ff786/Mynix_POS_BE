@@ -66,6 +66,18 @@ public class Sale {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    /*
+     * AUDIT INFORMATION
+     */
+    @Column(name = "created_by")
+    private String createdBy;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @Column(name = "updated_by")
+    private String updatedBy;
+
     @Builder.Default
     @OneToMany(
             mappedBy = "sale",

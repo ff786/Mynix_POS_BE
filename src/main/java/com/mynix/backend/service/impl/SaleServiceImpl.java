@@ -10,6 +10,7 @@ import com.mynix.backend.model.Sale;
 import com.mynix.backend.dto.sales.SaleItemUpdateRequest;
 import com.mynix.backend.model.SaleItem;
 import com.mynix.backend.repository.CustomerTransactionRepository;
+import com.mynix.backend.repository.SaleItemRepository;
 import com.mynix.backend.repository.SaleRepository;
 import com.mynix.backend.service.SaleService;
 import com.mynix.backend.service.SmsService;
@@ -28,6 +29,7 @@ import java.util.List;
 @Transactional
 public class SaleServiceImpl implements SaleService {
 
+    private final SaleItemRepository saleItemRepository;
     private final SaleRepository saleRepository;
     private final CustomerTransactionRepository transactionRepository;
 
@@ -75,50 +77,111 @@ public class SaleServiceImpl implements SaleService {
 
         // Update sale items
         if (request.getItems() != null) {
-            for (SaleItemUpdateRequest itemRequest : request.getItems()) {
+
+            List<Long> requestedItemIds =
+                request.getItems()
+                    .stream()
+                    .map(SaleItemUpdateRequest::getId)
+                    .filter(id -> id != null)
+                    .toList();
+
+
+            /*Remove existing items that are no longer present.             */
+
+            List<SaleItem> itemsToRemove =
+                sale.getItems()
+                    .stream()
+                    .filter(existingItem ->
+                        existingItem.getId() != null &&
+                            !requestedItemIds.contains(
+                                    existingItem.getId()
+                            )
+                     )
+                    .toList();
+
+
+            for (SaleItem item : itemsToRemove) {
+
+                sale.getItems().remove(item);
+
+                /*
+                 * Because Sale.items uses:
+                 *
+                 * cascade = CascadeType.ALL
+                 * orphanRemoval = true
+                 *
+                 * removing it from the collection will remove
+                 * the corresponding database record.
+                 */
+            }
+            /*
+             * Do not allow a sale to have zero products.
+             */
+            if (sale.getItems().isEmpty()) {
+
+                throw new RuntimeException(
+                        "A sale must contain at least one product."
+                );
+            }
+            /* Update remaining items.*/
+            for (SaleItemUpdateRequest itemRequest :
+                    request.getItems()) {
+
                 if (itemRequest.getId() == null) {
+
                     throw new RuntimeException(
                             "Sale item ID is required."
                     );
                 }
 
-                SaleItem item = sale.getItems()
-                        .stream()
-                        .filter(existingItem ->
-                                existingItem.getId()
-                                        .equals(itemRequest.getId())
-                        )
-                        .findFirst()
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Sale item does not belong to this sale."
-                                )
-                        );
 
-                // Update quantity
+                SaleItem item =
+                        sale.getItems()
+                                .stream()
+                                .filter(existingItem ->
+                                        existingItem.getId()
+                                                .equals(
+                                                        itemRequest.getId()
+                                                )
+                                )
+                                .findFirst()
+                                .orElseThrow(() ->
+                                        new RuntimeException(
+                                                "Sale item does not belong to this sale."
+                                        )
+                                );
+
+                //Update quantity
                 if (itemRequest.getQuantity() != null) {
+
                     if (itemRequest.getQuantity() <= 0) {
+
                         throw new RuntimeException(
                                 "Quantity must be greater than zero."
                         );
                     }
 
-                    item.setQuantity(itemRequest.getQuantity());
+                    item.setQuantity(
+                            itemRequest.getQuantity()
+                    );
                 }
-
-                // Update unit price
+                //Update unit price
                 if (itemRequest.getUnitPrice() != null) {
+
                     if (itemRequest.getUnitPrice()
                             .compareTo(BigDecimal.ZERO) < 0) {
+
                         throw new RuntimeException(
                                 "Unit price cannot be negative."
                         );
                     }
 
-                    item.setUnitPrice(itemRequest.getUnitPrice());
+                    item.setUnitPrice(
+                            itemRequest.getUnitPrice()
+                    );
                 }
 
-                // Recalculate line total
+                //Recalculate line total
                 BigDecimal lineTotal =
                         item.getUnitPrice()
                                 .multiply(
@@ -277,18 +340,18 @@ public class SaleServiceImpl implements SaleService {
 
         List<SaleItemResponse> items =
                 sale.getItems()
-                        .stream()
-                        .map(item ->
-                                SaleItemResponse.builder()
-                                        .id(item.getId())
-                                        .productName(item.getProductName())
-                                        .barcode(item.getBarcode())
-                                        .quantity(item.getQuantity())
-                                        .unitPrice(item.getUnitPrice())
-                                        .lineTotal(item.getLineTotal())
-                                        .build()
-                        )
-                        .toList();
+                    .stream()
+                    .map(item ->
+                        SaleItemResponse.builder()
+                            .id(item.getId())
+                            .productName(item.getProductName())
+                            .barcode(item.getBarcode())
+                            .quantity(item.getQuantity())
+                            .unitPrice(item.getUnitPrice())
+                            .lineTotal(item.getLineTotal())
+                            .build()
+                    )
+                    .toList();
 
         Long customerId = null;
         String customerName = null;

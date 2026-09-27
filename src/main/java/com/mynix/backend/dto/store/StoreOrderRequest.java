@@ -31,6 +31,13 @@ public class StoreOrderRequest {
     @NotNull
     private OnlinePaymentMethod paymentMethod;
 
+    /** Guest checkout: proof the mobile number was verified by SMS code (purpose CHECKOUT). */
+    @Size(max = 100)
+    private String verificationToken;
+
+    /** Signed-in checkout: the customer's account (the website vouches for the session). */
+    private Long customerId;
+
     /** OnePay transaction id — required for CARD, only after the payment is verified. */
     @Size(max = 100)
     private String paymentReference;

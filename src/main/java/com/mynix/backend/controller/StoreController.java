@@ -2,7 +2,11 @@ package com.mynix.backend.controller;
 
 import com.mynix.backend.dto.store.StoreOrderRequest;
 import com.mynix.backend.dto.store.StoreOrderResponse;
+import com.mynix.backend.dto.store.StoreCustomerResponse;
 import com.mynix.backend.dto.store.StoreProductResponse;
+import com.mynix.backend.dto.store.StoreSignInRequest;
+import com.mynix.backend.dto.store.StoreVerificationRequest;
+import com.mynix.backend.dto.store.StoreVerificationResponse;
 import com.mynix.backend.exception.StoreNotFoundException;
 import com.mynix.backend.service.StoreService;
 import jakarta.validation.Valid;
@@ -49,6 +53,31 @@ public class StoreController {
             @PathVariable @Pattern(regexp = "^INV-[0-9]{8}-[0-9]{1,6}$") String invoiceNumber,
             @RequestParam @NotBlank @Size(max = 20) String phone) {
         return storeService.getOrder(invoiceNumber, phone);
+    }
+
+    @PostMapping("/verification/send")
+    public StoreVerificationResponse sendCode(@Valid @RequestBody StoreVerificationRequest request) {
+        return storeService.sendVerificationCode(request);
+    }
+
+    @PostMapping("/verification/check")
+    public StoreVerificationResponse checkCode(@Valid @RequestBody StoreVerificationRequest request) {
+        return storeService.checkVerificationCode(request);
+    }
+
+    @PostMapping("/customers/sign-in")
+    public StoreCustomerResponse signIn(@Valid @RequestBody StoreSignInRequest request) {
+        return storeService.signIn(request);
+    }
+
+    @GetMapping("/customers/{customerId}")
+    public StoreCustomerResponse customer(@PathVariable Long customerId) {
+        return storeService.getCustomer(customerId);
+    }
+
+    @GetMapping("/customers/{customerId}/orders")
+    public List<StoreOrderResponse> customerOrders(@PathVariable Long customerId) {
+        return storeService.getCustomerOrders(customerId);
     }
 
     // Store-only error responses: clear 400/404s for the website, without

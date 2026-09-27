@@ -9,6 +9,7 @@ import com.mynix.backend.repository.CategoryRepository;
 import com.mynix.backend.repository.CustomerRepository;
 import com.mynix.backend.repository.ProductRepository;
 import com.mynix.backend.repository.UserRepository;
+import com.mynix.backend.service.SmsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +19,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
@@ -26,14 +28,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 
-/** The online store API over real HTTP: permissions, orders, and that staff flows still work. */
+/** The online store API over real HTTP: permissions, verification, orders, accounts. */
 @IntegrationTest
 class StoreApiTest {
 
     private static final String PASSWORD = "test-password-123";
+    private static final Pattern CODE = Pattern.compile("code: ([0-9]{6})");
 
     @Autowired Environment environment;
     @Autowired UserRepository userRepository;
@@ -43,6 +52,10 @@ class StoreApiTest {
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired JdbcTemplate jdbc;
 
+    /** Stands in for text.lk: remembers the last code "sent" to each number. */
+    @MockitoBean SmsService smsService;
+    final Map<String, String> sentCodes = new ConcurrentHashMap<>();
+
     RestClient http;
     String storeToken;
     String cashierToken;
@@ -51,6 +64,12 @@ class StoreApiTest {
 
     @BeforeEach
     void setUp() {
+        doAnswer(invocation -> {
+            Matcher m = CODE.matcher(invocation.getArgument(1, String.class));
+            if (m.find()) sentCodes.put(invocation.getArgument(0, String.class), m.group(1));
+            return null;
+        }).when(smsService).sendSms(anyString(), anyString());
+
         http = RestClient.builder()
                 .baseUrl("http://localhost:" + environment.getProperty("local.server.port"))
                 .defaultStatusHandler(status -> true, (request, response) -> { })
@@ -72,7 +91,7 @@ class StoreApiTest {
                 .stockQuantity(5).active(false).build());
     }
 
-    // --- catalogue --------------------------------------------------------------
+    // --- catalogue & permissions --------------------------------------------------
 
     @Test
     void storeSeesActiveProductsWithoutBuyingPrices() {
@@ -88,8 +107,6 @@ class StoreApiTest {
         assertThat(mine).doesNotContainKeys("buyingPrice", "minimumStock", "active", "createdAt");
         assertThat(products).noneMatch(p -> ((String) p.get("barcode")).startsWith("R-"));
     }
-
-    // --- permissions ------------------------------------------------------------
 
     @Test
     void storeAccountCannotReachAnyStaffEndpoint() {
@@ -119,11 +136,56 @@ class StoreApiTest {
         assertThat(stock()).isEqualTo(4);
     }
 
-    // --- orders -----------------------------------------------------------------
+    // --- phone verification ---------------------------------------------------------
 
     @Test
-    void cashOnDeliveryOrderBecomesACashSaleWithDeliveryFee() {
-        ResponseEntity<Map> response = placeOrder(order(2, "CASH_ON_DELIVERY", null, "+94 77 123 4567"));
+    void ordersNeedAVerifiedPhone() {
+        String phone = newPhone();
+        Map<String, Object> unverified = order(1, "CASH_ON_DELIVERY", phone, null);
+        assertThat(placeOrder(unverified).getStatusCode().value()).isEqualTo(400);
+
+        // A token for another number doesn't work either.
+        Map<String, Object> otherNumber = order(1, "CASH_ON_DELIVERY", phone, verifiedToken(newPhone(), "CHECKOUT"));
+        assertThat(placeOrder(otherNumber).getStatusCode().value()).isEqualTo(400);
+        assertThat(stock()).isEqualTo(5);
+    }
+
+    @Test
+    void verificationTokenWorksOnce() {
+        String phone = newPhone();
+        String token = verifiedToken(phone, "CHECKOUT");
+        assertThat(placeOrder(order(1, "CASH_ON_DELIVERY", phone, token)).getStatusCode().value()).isEqualTo(201);
+        assertThat(placeOrder(order(1, "CASH_ON_DELIVERY", phone, token)).getStatusCode().value()).isEqualTo(400);
+        assertThat(stock()).isEqualTo(4);
+    }
+
+    @Test
+    void wrongCodesLockTheCodeAndResendsAreLimited() {
+        String phone = newPhone();
+        assertThat(send(phone, "CHECKOUT")).containsEntry("status", "SENT");
+        assertThat(send(phone, "CHECKOUT")).containsEntry("status", "TOO_SOON");
+
+        String code = sentCodes.get(phone);
+        String wrong = code.equals("000000") ? "111111" : "000000";
+        for (int i = 0; i < 5; i++) {
+            assertThat(check(phone, "CHECKOUT", wrong)).containsEntry("status", "INVALID");
+        }
+        // Five wrong guesses: even the right code no longer works.
+        assertThat(check(phone, "CHECKOUT", code)).containsEntry("status", "INVALID");
+    }
+
+    @Test
+    void checkoutCodeCannotSignIn() {
+        String token = verifiedToken(newPhone(), "CHECKOUT");
+        assertThat(signIn(token, "Someone").getStatusCode().value()).isEqualTo(400);
+    }
+
+    // --- orders -------------------------------------------------------------------------
+
+    @Test
+    void cashOnDeliveryIsACreditSaleThatStaffMarkPaid() {
+        String phone = newPhone();
+        ResponseEntity<Map> response = placeOrder(order(2, "CASH_ON_DELIVERY", phone, verifiedToken(phone, "CHECKOUT")));
 
         assertThat(response.getStatusCode().value()).isEqualTo(201);
         Map<String, Object> body = response.getBody();
@@ -133,19 +195,36 @@ class StoreApiTest {
         assertThat(stock()).isEqualTo(3);
 
         Map<String, Object> sale = jdbc.queryForMap("""
-                SELECT s.payment_method, s.delivery_fee, s.created_by, c.contact_number, c.name
+                SELECT s.payment_method, s.delivery_fee, s.created_by, s.customer_id, c.contact_number
                 FROM sales s JOIN customers c ON c.id = s.customer_id
                 WHERE s.invoice_number = ?""", body.get("invoiceNumber"));
-        assertThat(sale.get("payment_method")).isEqualTo("CASH");
+        assertThat(sale.get("payment_method")).isEqualTo("CREDIT");
         assertThat((BigDecimal) sale.get("delivery_fee")).isEqualByComparingTo("450.00");
         assertThat((String) sale.get("created_by")).startsWith("store-");
-        assertThat(sale.get("contact_number")).isEqualTo("0771234567");
-        assertThat(sale.get("name")).isEqualTo("Nimal Perera");
+        assertThat(sale.get("contact_number")).isEqualTo(phone);
+        long customerId = ((Number) sale.get("customer_id")).longValue();
+        assertThat(outstanding(customerId)).isEqualByComparingTo("5450.00");
+
+        // Courier brings the cash: staff record it in the POS as usual.
+        assertThat(status(HttpMethod.POST, "/api/customers/" + customerId + "/payments", cashierToken,
+                Map.of("amount", 5450, "paymentMethod", "CASH", "description", "COD collected"))).isIn(200, 201);
+        assertThat(outstanding(customerId)).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void bankTransferIsACreditSaleToo() {
+        String phone = newPhone();
+        ResponseEntity<Map> response = placeOrder(order(1, "BANK_TRANSFER", phone, verifiedToken(phone, "CHECKOUT")));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(201);
+        assertThat(jdbc.queryForObject("SELECT payment_method FROM sales WHERE invoice_number = ?",
+                String.class, response.getBody().get("invoiceNumber"))).isEqualTo("CREDIT");
     }
 
     @Test
     void retriedOrderIsNotPlacedTwice() {
-        Map<String, Object> request = order(1, "CASH_ON_DELIVERY", null, "0771112222");
+        String phone = newPhone();
+        Map<String, Object> request = order(1, "CASH_ON_DELIVERY", phone, verifiedToken(phone, "CHECKOUT"));
 
         String first = (String) placeOrder(request).getBody().get("invoiceNumber");
         String second = (String) placeOrder(request).getBody().get("invoiceNumber");
@@ -156,55 +235,60 @@ class StoreApiTest {
 
     @Test
     void cardOrdersNeedAUniqueVerifiedPaymentReference() {
-        assertThat(placeOrder(order(1, "CARD", null, "0771113333")).getStatusCode().value()).isEqualTo(400);
+        String phone = newPhone();
+        assertThat(placeOrder(order(1, "CARD", phone, verifiedToken(phone, "CHECKOUT"))).getStatusCode().value()).isEqualTo(400);
 
         String reference = "OP-" + UUID.randomUUID();
-        ResponseEntity<Map> paid = placeOrder(order(1, "CARD", reference, "0771113333"));
-        assertThat(paid.getStatusCode().value()).isEqualTo(201);
+        Map<String, Object> paid = order(1, "CARD", phone, verifiedToken(phone, "CHECKOUT"));
+        paid.put("paymentReference", reference);
+        ResponseEntity<Map> response = placeOrder(paid);
+        assertThat(response.getStatusCode().value()).isEqualTo(201);
         assertThat(jdbc.queryForObject("SELECT payment_method FROM sales WHERE invoice_number = ?",
-                String.class, paid.getBody().get("invoiceNumber"))).isEqualTo("CARD");
+                String.class, response.getBody().get("invoiceNumber"))).isEqualTo("CARD");
 
-        ResponseEntity<Map> reused = placeOrder(order(1, "CARD", reference, "0771113333"));
-        assertThat(reused.getStatusCode().value()).isEqualTo(400);
+        Map<String, Object> reused = order(1, "CARD", phone, verifiedToken(phone, "CHECKOUT"));
+        reused.put("paymentReference", reference);
+        assertThat(placeOrder(reused).getStatusCode().value()).isEqualTo(400);
         assertThat(stock()).isEqualTo(4);
     }
 
     @Test
     void outOfStockOrderLeavesNothingBehind() {
+        String phone = newPhone();
+        String token = verifiedToken(phone, "CHECKOUT");
         int ordersBefore = count("online_orders");
         int customersBefore = count("customers");
 
-        ResponseEntity<Map> response = placeOrder(order(6, "CASH_ON_DELIVERY", null, "0779998888"));
+        ResponseEntity<Map> response = placeOrder(order(6, "CASH_ON_DELIVERY", phone, token));
 
         assertThat(response.getStatusCode().value()).isEqualTo(400);
         assertThat((String) response.getBody().get("message")).contains("Insufficient stock");
         assertThat(stock()).isEqualTo(5);
         assertThat(count("online_orders")).isEqualTo(ordersBefore);
         assertThat(count("customers")).isEqualTo(customersBefore);
+        // The token wasn't spent, so the customer can fix the cart and retry.
+        assertThat(placeOrder(order(1, "CASH_ON_DELIVERY", phone, token)).getStatusCode().value()).isEqualTo(201);
     }
 
     @Test
     void invalidOrderIsRejectedWithoutDetails() {
-        Map<String, Object> request = order(1, "CASH_ON_DELIVERY", null, "0771234000");
+        String phone = newPhone();
+        Map<String, Object> request = order(1, "CASH_ON_DELIVERY", phone, verifiedToken(phone, "CHECKOUT"));
         request.remove("addressLine1");
         ResponseEntity<Map> response = placeOrder(request);
 
         assertThat(response.getStatusCode().value()).isEqualTo(400);
         assertThat(response.getBody()).containsEntry("message", "Invalid order details.");
-
-        Map<String, Object> badPhone = order(1, "CASH_ON_DELIVERY", null, "0112345678");
-        assertThat(placeOrder(badPhone).getStatusCode().value()).isEqualTo(400);
         assertThat(stock()).isEqualTo(5);
     }
 
     @Test
-    void existingPosCustomerIsReusedAndNotModified() {
-        String phone = "07" + (10000000 + (int) (Math.random() * 89999999));
-        Customer existing = customerRepository.save(Customer.builder()
-                .name("Shop Regular").contactNumber("+94" + phone.substring(1)).createdAt(LocalDateTime.now()).build());
+    void existingShopCustomerIsReusedAndNotModified() {
+        String phone = newPhone();
+        Customer existing = shopCustomer("Shop Regular", "+94" + phone.substring(1));
         int customersBefore = count("customers");
 
-        ResponseEntity<Map> response = placeOrder(order(1, "CASH_ON_DELIVERY", null, phone));
+        ResponseEntity<Map> response = placeOrder(order(1, "CASH_ON_DELIVERY", phone, verifiedToken(phone, "CHECKOUT")));
 
         assertThat(response.getStatusCode().value()).isEqualTo(201);
         assertThat(count("customers")).isEqualTo(customersBefore);
@@ -214,19 +298,91 @@ class StoreApiTest {
     }
 
     @Test
-    void trackingNeedsTheRightPhoneAndShowsCancelledWhenStaffDeleteTheSale() {
-        String invoice = (String) placeOrder(order(1, "CASH_ON_DELIVERY", null, "0775556666"))
-                .getBody().get("invoiceNumber");
+    void inactiveShopCustomerCannotOrderOnCredit() {
+        String phone = newPhone();
+        Customer inactive = shopCustomer("Closed Account", phone);
+        inactive.setActive(false);
+        customerRepository.save(inactive);
 
-        assertThat(track(invoice, "0775556666").getStatusCode().value()).isEqualTo(200);
-        assertThat(track(invoice, "0770000000").getStatusCode().value()).isEqualTo(404);
-
-        // Staff delete the sale in the POS exactly as before (e.g. refused COD).
-        assertThat(status(HttpMethod.DELETE, "/api/sales/" + invoice, adminToken, null)).isIn(200, 204);
-        assertThat(track(invoice, "0775556666").getBody()).containsEntry("status", "CANCELLED");
+        assertThat(placeOrder(order(1, "CASH_ON_DELIVERY", phone, verifiedToken(phone, "CHECKOUT")))
+                .getStatusCode().value()).isEqualTo(400);
+        assertThat(stock()).isEqualTo(5);
     }
 
-    // --- helpers ------------------------------------------------------------------
+    @Test
+    void trackingNeedsTheRightPhoneAndShowsCancelledWhenStaffDeleteTheSale() {
+        String phone = newPhone();
+        String invoice = (String) placeOrder(order(1, "CASH_ON_DELIVERY", phone, verifiedToken(phone, "CHECKOUT")))
+                .getBody().get("invoiceNumber");
+
+        assertThat(track(invoice, phone).getStatusCode().value()).isEqualTo(200);
+        assertThat(track(invoice, newPhone()).getStatusCode().value()).isEqualTo(404);
+
+        assertThat(status(HttpMethod.DELETE, "/api/sales/" + invoice, adminToken, null)).isIn(200, 204);
+        assertThat(track(invoice, phone).getBody()).containsEntry("status", "CANCELLED");
+    }
+
+    // --- customer accounts ------------------------------------------------------------
+
+    @Test
+    void shopCustomerSigningUpIsLinkedToTheirExistingRecord() {
+        String phone = newPhone();
+        Customer existing = shopCustomer("Shop Regular", "+94 " + phone.substring(1));
+        int customersBefore = count("customers");
+
+        Map<String, Object> verified = verify(phone, "ACCOUNT");
+        assertThat(verified).containsEntry("accountExists", false).containsEntry("existingCustomerName", "Shop Regular");
+
+        ResponseEntity<Map> account = signIn((String) verified.get("verificationToken"), null);
+        assertThat(account.getStatusCode().value()).isEqualTo(200);
+        assertThat(account.getBody()).containsEntry("id", existing.getId().intValue())
+                .containsEntry("name", "Shop Regular").containsEntry("phone", phone);
+        assertThat(count("customers")).isEqualTo(customersBefore);
+
+        assertThat(verify(phone, "ACCOUNT")).containsEntry("accountExists", true);
+    }
+
+    @Test
+    void newCustomerSignUpNeedsAName() {
+        String phone = newPhone();
+        assertThat(signIn((String) verify(phone, "ACCOUNT").get("verificationToken"), " ").getStatusCode().value()).isEqualTo(400);
+
+        ResponseEntity<Map> account = signIn((String) verify(phone, "ACCOUNT").get("verificationToken"), "Kamala Silva");
+        assertThat(account.getStatusCode().value()).isEqualTo(200);
+        assertThat(account.getBody()).containsEntry("name", "Kamala Silva").containsEntry("phone", phone);
+    }
+
+    @Test
+    void signedInCustomerOrdersWithoutACodeAndSeesTheirOrders() {
+        String phone = newPhone();
+        long customerId = ((Number) signIn((String) verify(phone, "ACCOUNT").get("verificationToken"), "Ruwan Fernando")
+                .getBody().get("id")).longValue();
+
+        Map<String, Object> request = order(1, "CASH_ON_DELIVERY", phone, null);
+        request.put("customerId", customerId);
+        String invoice = (String) placeOrder(request).getBody().get("invoiceNumber");
+        assertThat(invoice).startsWith("INV-");
+
+        ResponseEntity<List> orders = http.get().uri("/api/store/customers/{id}/orders", customerId)
+                .header("Authorization", "Bearer " + storeToken).retrieve().toEntity(List.class);
+        assertThat(orders.getBody()).extracting(o -> ((Map<?, ?>) o).get("invoiceNumber")).containsExactly(invoice);
+
+        // An account can't be used to order for someone else's number.
+        Map<String, Object> otherPhone = order(1, "CASH_ON_DELIVERY", newPhone(), null);
+        otherPhone.put("customerId", customerId);
+        assertThat(placeOrder(otherPhone).getStatusCode().value()).isEqualTo(400);
+    }
+
+    @Test
+    void customerWithoutAnAccountCannotOrderById() {
+        String phone = newPhone();
+        Customer shopOnly = shopCustomer("No Account", phone);
+        Map<String, Object> request = order(1, "CASH_ON_DELIVERY", phone, null);
+        request.put("customerId", shopOnly.getId());
+        assertThat(placeOrder(request).getStatusCode().value()).isEqualTo(400);
+    }
+
+    // --- helpers --------------------------------------------------------------------------
 
     private String user(String username, UserRole role) {
         userRepository.save(User.builder().fullName(username).username(username)
@@ -240,12 +396,48 @@ class StoreApiTest {
         return (String) response.get("token");
     }
 
-    private Map<String, Object> order(int quantity, String paymentMethod, String reference, String phone) {
+    private Customer shopCustomer(String name, String contactNumber) {
+        return customerRepository.save(Customer.builder()
+                .name(name).contactNumber(contactNumber).createdAt(LocalDateTime.now()).build());
+    }
+
+    private static String newPhone() {
+        return "07" + ThreadLocalRandom.current().nextInt(10_000_000, 99_999_999);
+    }
+
+    private Map<String, Object> send(String phone, String purpose) {
+        return storePost("/api/store/verification/send", Map.of("phone", phone, "purpose", purpose)).getBody();
+    }
+
+    private Map<String, Object> check(String phone, String purpose, String code) {
+        return storePost("/api/store/verification/check", Map.of("phone", phone, "purpose", purpose, "code", code)).getBody();
+    }
+
+    private Map<String, Object> verify(String phone, String purpose) {
+        jdbc.update("UPDATE customer_otps SET created_at = created_at - interval '2 minutes' WHERE phone = ?", phone);
+        assertThat(send(phone, purpose)).containsEntry("status", "SENT");
+        Map<String, Object> result = check(phone, purpose, sentCodes.get(phone));
+        assertThat(result).containsEntry("status", "VERIFIED");
+        return result;
+    }
+
+    private String verifiedToken(String phone, String purpose) {
+        return (String) verify(phone, purpose).get("verificationToken");
+    }
+
+    private ResponseEntity<Map> signIn(String token, String name) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("verificationToken", token);
+        if (name != null) body.put("name", name);
+        return storePost("/api/store/customers/sign-in", body);
+    }
+
+    private Map<String, Object> order(int quantity, String paymentMethod, String phone, String verificationToken) {
         Map<String, Object> request = new HashMap<>();
         request.put("requestId", UUID.randomUUID().toString());
         request.put("items", List.of(Map.of("barcode", torch.getBarcode(), "quantity", quantity)));
         request.put("paymentMethod", paymentMethod);
-        if (reference != null) request.put("paymentReference", reference);
+        if (verificationToken != null) request.put("verificationToken", verificationToken);
         request.put("deliveryFee", 450);
         request.put("customerName", "Nimal Perera");
         request.put("customerPhone", phone);
@@ -256,8 +448,13 @@ class StoreApiTest {
     }
 
     private ResponseEntity<Map> placeOrder(Map<String, Object> request) {
-        return http.post().uri("/api/store/orders").header("Authorization", "Bearer " + storeToken)
-                .contentType(MediaType.APPLICATION_JSON).body(request).retrieve().toEntity(Map.class);
+        return storePost("/api/store/orders", request);
+    }
+
+    @SuppressWarnings("unchecked")
+    private ResponseEntity<Map> storePost(String path, Object body) {
+        return http.post().uri(path).header("Authorization", "Bearer " + storeToken)
+                .contentType(MediaType.APPLICATION_JSON).body(body).retrieve().toEntity(Map.class);
     }
 
     private ResponseEntity<Map> track(String invoice, String phone) {
@@ -270,6 +467,12 @@ class StoreApiTest {
         if (token != null) spec.header("Authorization", "Bearer " + token);
         if (body != null) spec.contentType(MediaType.APPLICATION_JSON).body(body);
         return spec.retrieve().toBodilessEntity().getStatusCode().value();
+    }
+
+    private BigDecimal outstanding(long customerId) {
+        return jdbc.queryForObject("""
+                SELECT COALESCE(SUM(CASE WHEN type = 'PAYMENT' THEN -amount ELSE amount END), 0)
+                FROM customer_transactions WHERE customer_id = ?""", BigDecimal.class, customerId);
     }
 
     private int stock() {

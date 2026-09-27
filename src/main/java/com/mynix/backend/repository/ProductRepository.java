@@ -13,6 +13,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findByBarcode(String barcode);
     List<Product> findByActiveTrue();
+
+    /** Active products with their category in one query (online store catalogue). */
+    @Query("""
+        SELECT p
+        FROM Product p
+        JOIN FETCH p.category
+        WHERE p.active = true
+        ORDER BY p.name
+        """)
+    List<Product> findActiveWithCategory();
     List<Product> findByNameContainingIgnoreCaseAndActiveTrue(String name);
 
     boolean existsByBarcode(String barcode);

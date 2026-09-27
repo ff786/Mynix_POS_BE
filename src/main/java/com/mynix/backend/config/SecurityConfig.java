@@ -93,6 +93,14 @@ public class SecurityConfig {
                         ).permitAll()
 
                         /*
+                         * Online store: the website's server account only.
+                         * Staff don't use it, and it can't reach anything else.
+                         */
+                        .requestMatchers(
+                                "/api/store/**"
+                        ).hasRole("ONLINE_STORE")
+
+                        /*
                          * Admin only
                          */
                         .requestMatchers(
@@ -117,9 +125,13 @@ public class SecurityConfig {
                         )
 
                         /*
-                         * Everything else requires authentication
+                         * Everything else: signed-in staff (the only roles
+                         * that existed before the online store account).
                          */
-                        .anyRequest().authenticated()
+                        .anyRequest().hasAnyRole(
+                                "ADMIN",
+                                "CASHIER"
+                        )
                 )
 
                 /*

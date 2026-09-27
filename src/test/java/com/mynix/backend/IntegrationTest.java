@@ -11,9 +11,10 @@ import java.lang.annotation.Target;
 /** Full application against the Testcontainers database, with SMS switched off. */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@SpringBootTest(properties = {
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "SPRING_DATASOURCE_PASSWORD=unused-with-testcontainers",
-        "JWT_SECRET=test-only-secret-test-only-secret-test-only-secret-0123456789",
+        // Base64, like production (JwtService decodes it). Test-only value.
+        "JWT_SECRET=bXluaXgtdGVzdC1vbmx5LWp3dC1zZWNyZXQtbm90LWZvci1wcm9kdWN0aW9uLXVzZS0wMDAwMDA=",
         "TEXTLK_API_TOKEN=test-token",
         "MYNIX_SMS_ENABLED=false"
 })

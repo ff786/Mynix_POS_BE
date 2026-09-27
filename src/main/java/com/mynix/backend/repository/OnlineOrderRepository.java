@@ -1,0 +1,16 @@
+package com.mynix.backend.repository;
+
+import com.mynix.backend.model.OnlineOrder;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+import java.util.UUID;
+
+public interface OnlineOrderRepository extends JpaRepository<OnlineOrder, Long> {
+
+    Optional<OnlineOrder> findByRequestId(UUID requestId);
+
+    Optional<OnlineOrder> findByInvoiceNumber(String invoiceNumber);
+
+    boolean existsByPaymentReference(String paymentReference);
+}

@@ -128,13 +128,12 @@ public class SecurityConfig {
                 .addFilterBefore(
                         jwtFilter,
                         UsernamePasswordAuthenticationFilter.class
-                )
+                );
 
-                /*
-                 * Keep HTTP Basic if your existing
-                 * backend requires it.
-                 */
-                .httpBasic(Customizer.withDefaults());
+        /*
+         * HTTP Basic is intentionally not enabled: every request must use a
+         * JWT from /api/auth, so passwords are only ever checked at login.
+         */
 
         return http.build();
     }

@@ -154,11 +154,13 @@ public class PosServiceImpl implements PosService {
         sale.setItems(saleItems);
         saleRepository.save(sale);
 
-        // Reduce stock
-        for (CheckoutItem item : request.getItems()) {
-            Product product = productRepository.findByBarcode(item.getBarcode()).orElseThrow();
-            product.setStockQuantity(product.getStockQuantity() - item.getQuantity());
-            productRepository.save(product);
+        // Reduce stock atomically; if another sale took it first, the whole
+        // checkout (sale included) rolls back.
+        for (SaleItem item : saleItems) {
+            int updated = productRepository.decrementStock(item.getProduct().getId(), item.getQuantity());
+            if (updated == 0) {
+                throw new RuntimeException("Insufficient stock for " + item.getProductName() + ".");
+            }
         }
 
         // CREDIT SALE & CHEQUE PAYMENT TRANSACTIONS

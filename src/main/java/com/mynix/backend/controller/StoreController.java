@@ -11,7 +11,10 @@ import com.mynix.backend.dto.store.StoreVerificationResponse;
 import com.mynix.backend.exception.StoreNotFoundException;
 import com.mynix.backend.dto.newsletter.NewsletterSignupRequest;
 import com.mynix.backend.service.StoreService;
+import com.mynix.backend.service.impl.CustomerProfileService;
 import com.mynix.backend.service.impl.NewsletterService;
+import com.mynix.backend.dto.store.StoreAddressRequest;
+import com.mynix.backend.dto.store.StoreAddressResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -40,6 +43,7 @@ public class StoreController {
 
     private final StoreService storeService;
     private final NewsletterService newsletterService;
+    private final CustomerProfileService profileService;
 
     @GetMapping("/products")
     public List<StoreProductResponse> products() {
@@ -88,6 +92,41 @@ public class StoreController {
     public StoreCustomerResponse updateCustomer(@PathVariable Long customerId,
                                                 @Valid @RequestBody StoreCustomerUpdateRequest request) {
         return storeService.updateCustomer(customerId, request);
+    }
+
+    @GetMapping("/customers/{customerId}/addresses")
+    public List<StoreAddressResponse> addresses(@PathVariable Long customerId) {
+        return profileService.addresses(customerId);
+    }
+
+    @PostMapping("/customers/{customerId}/addresses")
+    @ResponseStatus(HttpStatus.CREATED)
+    public StoreAddressResponse addAddress(@PathVariable Long customerId,
+                                           @Valid @RequestBody StoreAddressRequest request) {
+        return profileService.addAddress(customerId, request);
+    }
+
+    @PutMapping("/customers/{customerId}/addresses/{addressId}")
+    public StoreAddressResponse updateAddress(@PathVariable Long customerId, @PathVariable Long addressId,
+                                              @Valid @RequestBody StoreAddressRequest request) {
+        return profileService.updateAddress(customerId, addressId, request);
+    }
+
+    @DeleteMapping("/customers/{customerId}/addresses/{addressId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteAddress(@PathVariable Long customerId, @PathVariable Long addressId) {
+        profileService.deleteAddress(customerId, addressId);
+    }
+
+    @PostMapping("/customers/{customerId}/addresses/{addressId}/default")
+    public StoreAddressResponse makeDefault(@PathVariable Long customerId, @PathVariable Long addressId) {
+        return profileService.makeDefault(customerId, addressId);
+    }
+
+    @DeleteMapping("/customers/{customerId}/account")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void closeAccount(@PathVariable Long customerId) {
+        profileService.closeAccount(customerId);
     }
 
     @GetMapping("/customers/{customerId}/orders")

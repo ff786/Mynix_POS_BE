@@ -272,7 +272,17 @@ public class StoreServiceImpl implements StoreService {
     public StoreCustomerResponse updateCustomer(Long customerId, StoreCustomerUpdateRequest request) {
 
         Customer customer = requireAccount(customerId);
-        customer.setEmail(normalizeEmail(request.getEmail()));
+        String name = blankToNull(request.getName());
+        String email = normalizeEmail(request.getEmail());
+        if (name == null && email == null) {
+            throw new RuntimeException("Nothing to update.");
+        }
+        if (name != null) {
+            customer.setName(name);
+        }
+        if (email != null) {
+            customer.setEmail(email);
+        }
         customer.setUpdatedAt(LocalDateTime.now());
         return toCustomer(customerRepository.save(customer));
     }

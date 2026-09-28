@@ -5,6 +5,6 @@ import com.mynix.backend.dto.auth.LoginResponse;
 
 public interface AuthService {
 
-    LoginResponse login(LoginRequest request);
+    LoginResponse login(LoginRequest request, String clientAddress);
 
 }

@@ -36,31 +36,40 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7);
-        String username = jwtService.extractUsername(token);
 
-        if (username != null &&
-                SecurityContextHolder.getContext().getAuthentication() == null) {
+        // A malformed, expired or wrongly signed token, or a deactivated or
+        // deleted account, simply leaves the request unauthenticated (401/403)
+        // instead of failing with a server error.
+        try {
+            String username = jwtService.extractUsername(token);
 
-            UserDetails userDetails =
-                    userDetailsService.loadUserByUsername(username);
+            if (username != null &&
+                    SecurityContextHolder.getContext().getAuthentication() == null) {
 
-            if (jwtService.isTokenValid(token, userDetails)) {
+                UserDetails userDetails =
+                        userDetailsService.loadUserByUsername(username);
 
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities()
-                        );
+                if (userDetails.isEnabled() &&
+                        jwtService.isTokenValid(token, userDetails)) {
 
-                authentication.setDetails(
-                        new WebAuthenticationDetailsSource()
-                                .buildDetails(request)
-                );
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    userDetails.getAuthorities()
+                            );
 
-                SecurityContextHolder.getContext()
-                        .setAuthentication(authentication);
+                    authentication.setDetails(
+                            new WebAuthenticationDetailsSource()
+                                    .buildDetails(request)
+                    );
+
+                    SecurityContextHolder.getContext()
+                            .setAuthentication(authentication);
+                }
             }
+        } catch (RuntimeException invalidTokenOrUser) {
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);

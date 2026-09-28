@@ -117,7 +117,7 @@ public class StoreServiceImpl implements StoreService {
             customer = findOrCreateCustomer(customerName, phone);
         }
 
-        // Cash on delivery and bank transfer are POS credit sales, which need a customer.
+        // Cash on delivery is a POS credit sale, which needs a customer.
         if (customer == null && request.getPaymentMethod().posPaymentMethod() == PaymentMethod.CREDIT) {
             throw new RuntimeException(ACCOUNT_UNAVAILABLE);
         }

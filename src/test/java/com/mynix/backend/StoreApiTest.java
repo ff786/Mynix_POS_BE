@@ -212,13 +212,11 @@ class StoreApiTest {
     }
 
     @Test
-    void bankTransferIsACreditSaleToo() {
+    void bankTransferIsNotAnOnlineOption() {
         String phone = newPhone();
-        ResponseEntity<Map> response = placeOrder(order(1, "BANK_TRANSFER", phone, verifiedToken(phone, "CHECKOUT")));
-
-        assertThat(response.getStatusCode().value()).isEqualTo(201);
-        assertThat(jdbc.queryForObject("SELECT payment_method FROM sales WHERE invoice_number = ?",
-                String.class, response.getBody().get("invoiceNumber"))).isEqualTo("CREDIT");
+        assertThat(placeOrder(order(1, "BANK_TRANSFER", phone, verifiedToken(phone, "CHECKOUT")))
+                .getStatusCode().value()).isEqualTo(400);
+        assertThat(stock()).isEqualTo(5);
     }
 
     @Test

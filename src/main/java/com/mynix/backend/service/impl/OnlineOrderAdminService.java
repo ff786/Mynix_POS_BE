@@ -5,7 +5,6 @@ import com.mynix.backend.dto.onlineorder.OnlineOrderResponse;
 import com.mynix.backend.exception.StoreNotFoundException;
 import com.mynix.backend.model.OnlineOrder;
 import com.mynix.backend.model.OnlineOrderStatus;
-import com.mynix.backend.model.OnlinePaymentMethod;
 import com.mynix.backend.model.PaymentMethod;
 import com.mynix.backend.model.Sale;
 import com.mynix.backend.model.SaleItem;
@@ -77,7 +76,7 @@ public class OnlineOrderAdminService {
                 require(current, EnumSet.of(OnlineOrderStatus.PLACED, OnlineOrderStatus.PACKED,
                         OnlineOrderStatus.DISPATCHED), "delivered");
                 Sale sale = order.getSale();
-                if (order.getPaymentMethod() == OnlinePaymentMethod.CASH_ON_DELIVERY) {
+                if (order.getPaymentMethod().collectsCashOnDelivery()) {
                     recordCashCollected(order, sale);
                 }
                 order.setStatus(OnlineOrderStatus.DELIVERED);
@@ -161,6 +160,7 @@ public class OnlineOrderAdminService {
                 .invoiceNumber(order.getInvoiceNumber())
                 .status(effectiveStatus(order).name())
                 .paymentMethod(order.getPaymentMethod().name())
+                .channel(order.getChannel().name())
                 .placedAt(order.getCreatedAt())
                 .statusUpdatedAt(order.getStatusUpdatedAt())
                 .statusUpdatedBy(order.getStatusUpdatedBy())

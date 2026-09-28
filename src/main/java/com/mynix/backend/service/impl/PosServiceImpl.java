@@ -33,6 +33,7 @@ public class PosServiceImpl implements PosService {
     private final InvoiceNumberGenerator invoiceNumberGenerator;
 
     private final SmsService smsService;
+    private final DeliveryOrderService deliveryOrderService;
 
     @Override
     @Transactional
@@ -77,6 +78,11 @@ public class PosServiceImpl implements PosService {
             throw new RuntimeException(
                     "Customer is required for cheque sales."
             );
+        }
+
+        // "Deliver this order" (taken by phone / WhatsApp)
+        if (request.getDelivery() != null) {
+            deliveryOrderService.validate(request.getDelivery(), customer, request.getPaymentMethod());
         }
 
         // Calculate subtotal and build sale items
@@ -299,7 +305,13 @@ public class PosServiceImpl implements PosService {
         BigDecimal finalCustomerOutstanding =
                 customerOutstanding;
 
+        // Delivery orders get the delivery SMS (with the website invoice link).
+        if (request.getDelivery() != null) {
+            deliveryOrderService.create(sale, customer, request.getDelivery(), request.getPaymentMethod());
+        }
+
         if (sendInvoiceSms &&
+                request.getDelivery() == null &&
                 customer != null &&
                 customer.getContactNumber() != null &&
                 !customer.getContactNumber().isBlank() &&

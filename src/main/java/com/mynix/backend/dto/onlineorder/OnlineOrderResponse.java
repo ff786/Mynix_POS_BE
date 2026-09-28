@@ -14,6 +14,8 @@ public class OnlineOrderResponse {
     private String invoiceNumber;
     private String status;
     private String paymentMethod;
+    /** WEBSITE, PHONE or WHATSAPP. */
+    private String channel;
     private LocalDateTime placedAt;
     private LocalDateTime statusUpdatedAt;
     private String statusUpdatedBy;

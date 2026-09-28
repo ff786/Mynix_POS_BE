@@ -1,7 +1,6 @@
 package com.mynix.backend.service.impl;
 
 import com.mynix.backend.model.OnlineOrder;
-import com.mynix.backend.model.OnlinePaymentMethod;
 import com.mynix.backend.service.SmsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,33 +30,35 @@ public class OnlineOrderSmsService {
     private String websiteUrl;
 
     public void orderPlaced(OnlineOrder order, String invoiceToken, BigDecimal total) {
-        String payment = order.getPaymentMethod() == OnlinePaymentMethod.CARD
-                ? "Paid by card: Rs. " + money(total) + "."
-                : "Total Rs. " + money(total) + ", to pay on delivery. We'll call you to confirm.";
+        String payment = switch (order.getPaymentMethod()) {
+            case CASH_ON_DELIVERY -> "Total Rs. " + money(total) + ", to pay on delivery. We'll call you to confirm.";
+            case CARD -> "Paid by card: Rs. " + money(total) + ".";
+            case BANK_TRANSFER -> "Paid by bank transfer: Rs. " + money(total) + ".";
+        };
         send(order, "MYNIX: Thank you for your order " + order.getInvoiceNumber() + ". " + payment
                 + " View your invoice: " + site() + "/invoice/" + invoiceToken);
     }
 
     public void dispatched(OnlineOrder order, BigDecimal total) {
-        String payment = order.getPaymentMethod() == OnlinePaymentMethod.CARD
-                ? ""
-                : " Please keep Rs. " + money(total) + " ready for the courier.";
+        String payment = order.getPaymentMethod().collectsCashOnDelivery()
+                ? " Please keep Rs. " + money(total) + " ready for the courier."
+                : "";
         send(order, "MYNIX: Your order " + order.getInvoiceNumber() + " is on its way." + payment
                 + " Track it: " + site() + "/track");
     }
 
     public void delivered(OnlineOrder order, BigDecimal total) {
-        String payment = order.getPaymentMethod() == OnlinePaymentMethod.CARD
-                ? ""
-                : " We've received your payment of Rs. " + money(total) + ".";
+        String payment = order.getPaymentMethod().collectsCashOnDelivery()
+                ? " We've received your payment of Rs. " + money(total) + "."
+                : "";
         send(order, "MYNIX: Your order " + order.getInvoiceNumber() + " has been delivered." + payment
                 + " Thank you for shopping with MYNIX!");
     }
 
     public void cancelled(OnlineOrder order) {
-        String refund = order.getPaymentMethod() == OnlinePaymentMethod.CARD
-                ? " Your card payment will be refunded."
-                : "";
+        String refund = order.getPaymentMethod().collectsCashOnDelivery()
+                ? ""
+                : " Your payment will be refunded.";
         send(order, "MYNIX: Your order " + order.getInvoiceNumber() + " has been cancelled." + refund
                 + " Please contact us if you have any questions.");
     }

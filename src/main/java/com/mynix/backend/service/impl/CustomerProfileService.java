@@ -30,16 +30,84 @@ public class CustomerProfileService {
     private final CustomerAccountRepository accountRepository;
     private final CustomerAddressRepository addressRepository;
 
+    // --- website (the customer's own account) --------------------------------
+
     @Transactional(readOnly = true)
     public List<StoreAddressResponse> addresses(Long customerId) {
         requireAccount(customerId);
-        return addressRepository.findByCustomerIdOrderByIsDefaultDescCreatedAtAsc(customerId)
-                .stream().map(CustomerProfileService::toResponse).toList();
+        return addressesOf(customerId);
     }
 
     @Transactional
     public StoreAddressResponse addAddress(Long customerId, StoreAddressRequest request) {
         requireAccount(customerId);
+        return addFor(customerId, request);
+    }
+
+    @Transactional
+    public StoreAddressResponse updateAddress(Long customerId, Long addressId, StoreAddressRequest request) {
+        requireAccount(customerId);
+        return updateFor(customerId, addressId, request);
+    }
+
+    @Transactional
+    public void deleteAddress(Long customerId, Long addressId) {
+        requireAccount(customerId);
+        deleteFor(customerId, addressId);
+    }
+
+    @Transactional
+    public StoreAddressResponse makeDefault(Long customerId, Long addressId) {
+        requireAccount(customerId);
+        return makeDefaultFor(customerId, addressId);
+    }
+
+    // --- staff (any POS customer, with or without a website account) ---------
+
+    @Transactional(readOnly = true)
+    public List<StoreAddressResponse> addressesForStaff(Long customerId) {
+        requireCustomer(customerId);
+        return addressesOf(customerId);
+    }
+
+    @Transactional
+    public StoreAddressResponse addForStaff(Long customerId, StoreAddressRequest request) {
+        requireCustomer(customerId);
+        return addFor(customerId, request);
+    }
+
+    @Transactional
+    public StoreAddressResponse updateForStaff(Long customerId, Long addressId, StoreAddressRequest request) {
+        requireCustomer(customerId);
+        return updateFor(customerId, addressId, request);
+    }
+
+    @Transactional
+    public void deleteForStaff(Long customerId, Long addressId) {
+        requireCustomer(customerId);
+        deleteFor(customerId, addressId);
+    }
+
+    @Transactional
+    public StoreAddressResponse makeDefaultForStaff(Long customerId, Long addressId) {
+        requireCustomer(customerId);
+        return makeDefaultFor(customerId, addressId);
+    }
+
+    /** A saved address of this customer (for delivery orders taken in the POS). */
+    @Transactional(readOnly = true)
+    public CustomerAddress addressOf(Long customerId, Long addressId) {
+        return requireAddress(customerId, addressId);
+    }
+
+    // --- shared ------------------------------------------------------------------
+
+    private List<StoreAddressResponse> addressesOf(Long customerId) {
+        return addressRepository.findByCustomerIdOrderByIsDefaultDescCreatedAtAsc(customerId)
+                .stream().map(CustomerProfileService::toResponse).toList();
+    }
+
+    StoreAddressResponse addFor(Long customerId, StoreAddressRequest request) {
         long existing = addressRepository.countByCustomerId(customerId);
         if (existing >= MAX_ADDRESSES) {
             throw new RuntimeException("You can save up to " + MAX_ADDRESSES + " addresses.");
@@ -53,9 +121,7 @@ public class CustomerProfileService {
         return toResponse(addressRepository.save(address));
     }
 
-    @Transactional
-    public StoreAddressResponse updateAddress(Long customerId, Long addressId, StoreAddressRequest request) {
-        requireAccount(customerId);
+    private StoreAddressResponse updateFor(Long customerId, Long addressId, StoreAddressRequest request) {
         CustomerAddress address = requireAddress(customerId, addressId);
         if (request.isMakeDefault() && !address.getIsDefault()) {
             addressRepository.clearDefault(customerId);
@@ -67,9 +133,7 @@ public class CustomerProfileService {
         return toResponse(addressRepository.save(address));
     }
 
-    @Transactional
-    public void deleteAddress(Long customerId, Long addressId) {
-        requireAccount(customerId);
+    private void deleteFor(Long customerId, Long addressId) {
         CustomerAddress address = requireAddress(customerId, addressId);
         boolean wasDefault = address.getIsDefault();
         addressRepository.delete(address);
@@ -83,9 +147,7 @@ public class CustomerProfileService {
         }
     }
 
-    @Transactional
-    public StoreAddressResponse makeDefault(Long customerId, Long addressId) {
-        requireAccount(customerId);
+    private StoreAddressResponse makeDefaultFor(Long customerId, Long addressId) {
         requireAddress(customerId, addressId);
         addressRepository.clearDefault(customerId);
         CustomerAddress address = requireAddress(customerId, addressId);
@@ -103,6 +165,11 @@ public class CustomerProfileService {
         addressRepository.findByCustomerIdOrderByIsDefaultDescCreatedAtAsc(customerId)
                 .forEach(addressRepository::delete);
         accountRepository.deleteById(customerId);
+    }
+
+    private Customer requireCustomer(Long customerId) {
+        return customerRepository.findById(customerId)
+                .orElseThrow(() -> new StoreNotFoundException("Customer not found."));
     }
 
     private Customer requireAccount(Long customerId) {

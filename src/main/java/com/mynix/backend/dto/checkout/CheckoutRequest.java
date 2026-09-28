@@ -29,4 +29,8 @@ public class CheckoutRequest {
     @NotNull
     @DecimalMin("0.00")
     private BigDecimal deliveryFee = BigDecimal.ZERO;
+
+    /** Optional: deliver this order (taken by phone / WhatsApp). */
+    @Valid
+    private DeliveryDetails delivery;
 }

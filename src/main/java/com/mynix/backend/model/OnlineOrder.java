@@ -34,6 +34,11 @@ public class OnlineOrder {
     @Column(name = "payment_method", nullable = false, length = 30)
     private OnlinePaymentMethod paymentMethod;
 
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private OnlineOrderChannel channel = OnlineOrderChannel.WEBSITE;
+
     @Column(name = "payment_reference", unique = true, length = 100)
     private String paymentReference;
 

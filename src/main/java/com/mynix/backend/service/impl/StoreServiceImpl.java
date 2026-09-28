@@ -85,6 +85,10 @@ public class StoreServiceImpl implements StoreService {
             return toResponse(existing.get());
         }
 
+        if (request.getPaymentMethod() == OnlinePaymentMethod.BANK_TRANSFER) {
+            throw new RuntimeException("Please choose cash on delivery or card.");
+        }
+
         String paymentReference = blankToNull(request.getPaymentReference());
         if (request.getPaymentMethod() == OnlinePaymentMethod.CARD) {
             if (paymentReference == null) {

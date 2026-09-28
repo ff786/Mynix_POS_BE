@@ -37,6 +37,12 @@ public class PosServiceImpl implements PosService {
     @Override
     @Transactional
     public CheckoutResponse checkout(CheckoutRequest request) {
+        return checkout(request, true);
+    }
+
+    @Override
+    @Transactional
+    public CheckoutResponse checkout(CheckoutRequest request, boolean sendInvoiceSms) {
         // Validate customer/payment combination
         Customer customer = null;
 
@@ -293,7 +299,8 @@ public class PosServiceImpl implements PosService {
         BigDecimal finalCustomerOutstanding =
                 customerOutstanding;
 
-        if (customer != null &&
+        if (sendInvoiceSms &&
+                customer != null &&
                 customer.getContactNumber() != null &&
                 !customer.getContactNumber().isBlank() &&
                 sale.getPublicInvoiceToken() != null &&

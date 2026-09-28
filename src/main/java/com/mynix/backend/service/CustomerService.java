@@ -27,6 +27,13 @@ public interface CustomerService {
             PaymentRequest request
     );
 
+    /** notifyCustomer=false: the online store sends its own delivery SMS. */
+    PaymentResponse recordPayment(
+            Long customerId,
+            PaymentRequest request,
+            boolean notifyCustomer
+    );
+
     List<CustomerTransactionResponse> getTransactions(Long customerId);
 
 }

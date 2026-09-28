@@ -40,6 +40,7 @@ public class OnlineOrderAdminService {
     private final CustomerService customerService;
     private final SaleService saleService;
     private final EntityManager entityManager;
+    private final OnlineOrderSmsService orderSms;
 
     @Transactional(readOnly = true)
     public List<OnlineOrderResponse> list(OnlineOrderStatus status) {
@@ -70,6 +71,7 @@ public class OnlineOrderAdminService {
             case DISPATCH -> {
                 require(current, EnumSet.of(OnlineOrderStatus.PLACED, OnlineOrderStatus.PACKED), "dispatched");
                 order.setStatus(OnlineOrderStatus.DISPATCHED);
+                orderSms.dispatched(order, order.getSale().getGrandTotal());
             }
             case DELIVER -> {
                 require(current, EnumSet.of(OnlineOrderStatus.PLACED, OnlineOrderStatus.PACKED,
@@ -79,11 +81,13 @@ public class OnlineOrderAdminService {
                     recordCashCollected(order, sale);
                 }
                 order.setStatus(OnlineOrderStatus.DELIVERED);
+                orderSms.delivered(order, sale.getGrandTotal());
             }
             case CANCEL -> {
                 require(current, EnumSet.of(OnlineOrderStatus.PLACED, OnlineOrderStatus.PACKED,
                         OnlineOrderStatus.DISPATCHED), "cancelled");
                 cancel(order);
+                orderSms.cancelled(order);
             }
         }
 
@@ -104,7 +108,8 @@ public class OnlineOrderAdminService {
         payment.setPaymentMethod(PaymentMethod.CASH);
         payment.setDescription("Cash on delivery collected - " + order.getInvoiceNumber());
         try {
-            customerService.recordPayment(sale.getCustomer().getId(), payment);
+            // No shop "payment received" SMS: the delivered SMS covers it.
+            customerService.recordPayment(sale.getCustomer().getId(), payment, false);
         } catch (RuntimeException e) {
             throw new RuntimeException("Couldn't record the payment: " + e.getMessage()
                     + " If it was already recorded in Customers, check the customer's balance.");

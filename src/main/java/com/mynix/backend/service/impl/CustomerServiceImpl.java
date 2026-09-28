@@ -134,6 +134,16 @@ public class CustomerServiceImpl implements CustomerService {
             Long customerId,
             PaymentRequest request
     ) {
+        return recordPayment(customerId, request, true);
+    }
+
+    @Override
+    @Transactional
+    public PaymentResponse recordPayment(
+            Long customerId,
+            PaymentRequest request,
+            boolean notifyCustomer
+    ) {
 
         Customer customer =
                 getCustomer(customerId);
@@ -202,12 +212,14 @@ public class CustomerServiceImpl implements CustomerService {
                     paymentAmount
             );
 
-        smsService.sendPaymentSms(
-                customer,
-                paymentAmount,
-                request.getPaymentMethod(),
-                remainingOutstanding
-        );
+        if (notifyCustomer) {
+            smsService.sendPaymentSms(
+                    customer,
+                    paymentAmount,
+                    request.getPaymentMethod(),
+                    remainingOutstanding
+            );
+        }
 
         return PaymentResponse.builder()
             .customerId(customer.getId())

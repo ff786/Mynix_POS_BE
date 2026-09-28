@@ -59,6 +59,11 @@ public class StoreController {
         return storeService.getOrder(invoiceNumber, phone);
     }
 
+    @GetMapping("/invoices/{token}")
+    public StoreOrderResponse invoice(@PathVariable @Pattern(regexp = "^[a-f0-9]{32}$") String token) {
+        return storeService.getInvoice(token);
+    }
+
     @PostMapping("/verification/send")
     public StoreVerificationResponse sendCode(@Valid @RequestBody StoreVerificationRequest request) {
         return storeService.sendVerificationCode(request);

@@ -51,6 +51,10 @@ public class StoreServiceImpl implements StoreService {
     private final PosService posService;
     private final CustomerAccountRepository customerAccountRepository;
     private final PhoneVerificationService phoneVerification;
+    private final OnlineOrderSmsService orderSms;
+
+    /** How long the invoice link in the order SMS keeps working. */
+    private static final int INVOICE_LINK_DAYS = 60;
 
     private static final String ACCOUNT_UNAVAILABLE =
             "We can't take online orders for this number. Please contact us on WhatsApp.";
@@ -130,7 +134,8 @@ public class StoreServiceImpl implements StoreService {
         checkout.setDeliveryFee(request.getDeliveryFee());
         checkout.setCustomerId(customer == null ? null : customer.getId());
 
-        CheckoutResponse result = posService.checkout(checkout);
+        // Online customers get the website order SMS below, not the shop invoice SMS.
+        CheckoutResponse result = posService.checkout(checkout, false);
 
         Sale sale = saleRepository.findByInvoiceNumber(result.getInvoiceNumber()).orElseThrow();
 
@@ -151,6 +156,8 @@ public class StoreServiceImpl implements StoreService {
                 .postalCode(blankToNull(request.getPostalCode()))
                 .deliveryNotes(blankToNull(request.getDeliveryNotes()))
                 .build());
+
+        orderSms.orderPlaced(order, sale.getPublicInvoiceToken(), sale.getGrandTotal());
 
         // Guests may give an email at checkout; keep it if the shop has none yet.
         String orderEmail = normalizeEmail(request.getCustomerEmail());
@@ -279,6 +286,16 @@ public class StoreServiceImpl implements StoreService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public StoreOrderResponse getInvoice(String invoiceToken) {
+
+        return onlineOrderRepository.findBySale_PublicInvoiceToken(invoiceToken)
+                .filter(order -> order.getCreatedAt().isAfter(LocalDateTime.now().minusDays(INVOICE_LINK_DAYS)))
+                .map(this::toResponse)
+                .orElseThrow(() -> new StoreNotFoundException("Invoice not found."));
     }
 
     // --- helpers ---------------------------------------------------------------

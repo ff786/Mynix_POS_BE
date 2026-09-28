@@ -13,6 +13,8 @@ public interface OnlineOrderRepository extends JpaRepository<OnlineOrder, Long> 
 
     Optional<OnlineOrder> findByInvoiceNumber(String invoiceNumber);
 
+    Optional<OnlineOrder> findBySale_PublicInvoiceToken(String publicInvoiceToken);
+
     boolean existsByPaymentReference(String paymentReference);
 
     List<OnlineOrder> findTop50BySale_Customer_IdOrderByCreatedAtDesc(Long customerId);

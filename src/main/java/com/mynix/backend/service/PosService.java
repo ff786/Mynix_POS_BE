@@ -13,6 +13,12 @@ public interface PosService {
      * @return The checkout response.
      */
     CheckoutResponse checkout(CheckoutRequest request);
+
+    /**
+     * Same checkout; sendInvoiceSms=false lets the online store send its own
+     * order SMS instead of the shop invoice SMS.
+     */
+    CheckoutResponse checkout(CheckoutRequest request, boolean sendInvoiceSms);
     /* Get a product by its barcode.
      *
      * @param barcode The barcode of the product to retrieve.

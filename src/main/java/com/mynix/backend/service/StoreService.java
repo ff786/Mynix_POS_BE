@@ -20,6 +20,9 @@ public interface StoreService {
 
     StoreOrderResponse getOrder(String invoiceNumber, String phone);
 
+    /** Invoice link from the order SMS (website orders only). */
+    StoreOrderResponse getInvoice(String invoiceToken);
+
     StoreVerificationResponse sendVerificationCode(StoreVerificationRequest request);
 
     StoreVerificationResponse checkVerificationCode(StoreVerificationRequest request);

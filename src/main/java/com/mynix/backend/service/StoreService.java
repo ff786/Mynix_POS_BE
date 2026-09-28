@@ -3,6 +3,7 @@ package com.mynix.backend.service;
 import com.mynix.backend.dto.store.StoreOrderRequest;
 import com.mynix.backend.dto.store.StoreOrderResponse;
 import com.mynix.backend.dto.store.StoreCustomerResponse;
+import com.mynix.backend.dto.store.StoreCustomerUpdateRequest;
 import com.mynix.backend.dto.store.StoreProductResponse;
 import com.mynix.backend.dto.store.StoreSignInRequest;
 import com.mynix.backend.dto.store.StoreVerificationRequest;
@@ -27,6 +28,8 @@ public interface StoreService {
     StoreCustomerResponse signIn(StoreSignInRequest request);
 
     StoreCustomerResponse getCustomer(Long customerId);
+
+    StoreCustomerResponse updateCustomer(Long customerId, StoreCustomerUpdateRequest request);
 
     List<StoreOrderResponse> getCustomerOrders(Long customerId);
 }

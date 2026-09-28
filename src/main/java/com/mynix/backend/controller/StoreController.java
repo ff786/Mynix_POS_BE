@@ -3,6 +3,7 @@ package com.mynix.backend.controller;
 import com.mynix.backend.dto.store.StoreOrderRequest;
 import com.mynix.backend.dto.store.StoreOrderResponse;
 import com.mynix.backend.dto.store.StoreCustomerResponse;
+import com.mynix.backend.dto.store.StoreCustomerUpdateRequest;
 import com.mynix.backend.dto.store.StoreProductResponse;
 import com.mynix.backend.dto.store.StoreSignInRequest;
 import com.mynix.backend.dto.store.StoreVerificationRequest;
@@ -73,6 +74,12 @@ public class StoreController {
     @GetMapping("/customers/{customerId}")
     public StoreCustomerResponse customer(@PathVariable Long customerId) {
         return storeService.getCustomer(customerId);
+    }
+
+    @PatchMapping("/customers/{customerId}")
+    public StoreCustomerResponse updateCustomer(@PathVariable Long customerId,
+                                                @Valid @RequestBody StoreCustomerUpdateRequest request) {
+        return storeService.updateCustomer(customerId, request);
     }
 
     @GetMapping("/customers/{customerId}/orders")

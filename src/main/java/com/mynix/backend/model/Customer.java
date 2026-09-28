@@ -24,6 +24,10 @@ public class Customer {
     @Column(name = "contact_number", nullable = false, length = 30)
     private String contactNumber;
 
+    /** Optional; set from the website (account or checkout). */
+    @Column(length = 254)
+    private String email;
+
     @Column(nullable = false)
     @Builder.Default
     private Boolean active = true;

@@ -372,6 +372,59 @@ class StoreApiTest {
     }
 
     @Test
+    void newAccountsNeedAnEmailAndShopCustomersGetItAdded() {
+        String newPhone = newPhone();
+        assertThat(signIn((String) verify(newPhone, "ACCOUNT").get("verificationToken"), "No Email", null)
+                .getStatusCode().value()).isEqualTo(400);
+
+        String shopPhone = newPhone();
+        Customer existing = shopCustomer("Shop Regular", shopPhone);
+        ResponseEntity<Map> account = signIn((String) verify(shopPhone, "ACCOUNT").get("verificationToken"), null,
+                "Regular@Example.com");
+        assertThat(account.getBody()).containsEntry("id", existing.getId().intValue())
+                .containsEntry("email", "regular@example.com");
+        assertThat(customerRepository.findById(existing.getId()).orElseThrow().getEmail()).isEqualTo("regular@example.com");
+    }
+
+    @Test
+    void customersCanUpdateTheirEmailAndCheckoutKnowsTheirLastAddress() {
+        String phone = newPhone();
+        long customerId = ((Number) signIn((String) verify(phone, "ACCOUNT").get("verificationToken"), "Dilani")
+                .getBody().get("id")).longValue();
+
+        ResponseEntity<Map> updated = http.patch().uri("/api/store/customers/{id}", customerId)
+                .header("Authorization", "Bearer " + storeToken).contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("email", "dilani@example.com")).retrieve().toEntity(Map.class);
+        assertThat(updated.getBody()).containsEntry("email", "dilani@example.com");
+
+        Map<String, Object> request = order(1, "CASH_ON_DELIVERY", phone, null);
+        request.put("customerId", customerId);
+        placeOrder(request);
+
+        Map<?, ?> profile = http.get().uri("/api/store/customers/{id}", customerId)
+                .header("Authorization", "Bearer " + storeToken).retrieve().body(Map.class);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> address = (Map<String, Object>) profile.get("lastDeliveryAddress");
+        assertThat(address).containsEntry("addressLine1", "12 Temple Road")
+                .containsEntry("district", "Ratnapura");
+    }
+
+    @Test
+    void guestEmailFillsABlankButNeverOverwrites() {
+        String blankPhone = newPhone();
+        Customer blank = shopCustomer("No Email Yet", blankPhone);
+        Map<String, Object> first = order(1, "CASH_ON_DELIVERY", blankPhone, verifiedToken(blankPhone, "CHECKOUT"));
+        first.put("customerEmail", "first@example.com");
+        placeOrder(first);
+        assertThat(customerRepository.findById(blank.getId()).orElseThrow().getEmail()).isEqualTo("first@example.com");
+
+        Map<String, Object> second = order(1, "CASH_ON_DELIVERY", blankPhone, verifiedToken(blankPhone, "CHECKOUT"));
+        second.put("customerEmail", "someone-else@example.com");
+        placeOrder(second);
+        assertThat(customerRepository.findById(blank.getId()).orElseThrow().getEmail()).isEqualTo("first@example.com");
+    }
+
+    @Test
     void customerWithoutAnAccountCannotOrderById() {
         String phone = newPhone();
         Customer shopOnly = shopCustomer("No Account", phone);
@@ -424,9 +477,14 @@ class StoreApiTest {
     }
 
     private ResponseEntity<Map> signIn(String token, String name) {
+        return signIn(token, name, "customer@example.com");
+    }
+
+    private ResponseEntity<Map> signIn(String token, String name, String email) {
         Map<String, Object> body = new HashMap<>();
         body.put("verificationToken", token);
         if (name != null) body.put("name", name);
+        if (email != null) body.put("email", email);
         return storePost("/api/store/customers/sign-in", body);
     }
 

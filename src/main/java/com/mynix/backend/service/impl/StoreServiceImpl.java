@@ -7,6 +7,7 @@ import com.mynix.backend.dto.store.StoreOrderItem;
 import com.mynix.backend.dto.store.StoreOrderRequest;
 import com.mynix.backend.dto.store.StoreOrderResponse;
 import com.mynix.backend.dto.store.StoreCustomerResponse;
+import com.mynix.backend.dto.store.StoreCustomerUpdateRequest;
 import com.mynix.backend.dto.store.StoreProductResponse;
 import com.mynix.backend.dto.store.StoreSignInRequest;
 import com.mynix.backend.dto.store.StoreVerificationRequest;
@@ -151,6 +152,13 @@ public class StoreServiceImpl implements StoreService {
                 .deliveryNotes(blankToNull(request.getDeliveryNotes()))
                 .build());
 
+        // Guests may give an email at checkout; keep it if the shop has none yet.
+        String orderEmail = normalizeEmail(request.getCustomerEmail());
+        if (customer != null && orderEmail != null && blankToNull(customer.getEmail()) == null) {
+            customer.setEmail(orderEmail);
+            customerRepository.save(customer);
+        }
+
         return toResponse(order);
     }
 
@@ -226,6 +234,17 @@ public class StoreServiceImpl implements StoreService {
             throw new RuntimeException(ACCOUNT_UNAVAILABLE);
         }
 
+        boolean newAccount = !customerAccountRepository.existsById(customer.getId());
+        String email = normalizeEmail(request.getEmail());
+        if (newAccount && email == null && blankToNull(customer.getEmail()) == null) {
+            throw new RuntimeException("Please enter your email address.");
+        }
+        if (email != null) {
+            customer.setEmail(email);
+            customer.setUpdatedAt(LocalDateTime.now());
+            customerRepository.save(customer);
+        }
+
         CustomerAccount account = customerAccountRepository.findById(customer.getId())
                 .orElseGet(() -> CustomerAccount.builder().build());
         account.setCustomerId(customer.getId());
@@ -239,6 +258,16 @@ public class StoreServiceImpl implements StoreService {
     @Transactional(readOnly = true)
     public StoreCustomerResponse getCustomer(Long customerId) {
         return toCustomer(requireAccount(customerId));
+    }
+
+    @Override
+    @Transactional
+    public StoreCustomerResponse updateCustomer(Long customerId, StoreCustomerUpdateRequest request) {
+
+        Customer customer = requireAccount(customerId);
+        customer.setEmail(normalizeEmail(request.getEmail()));
+        customer.setUpdatedAt(LocalDateTime.now());
+        return toCustomer(customerRepository.save(customer));
     }
 
     @Override
@@ -299,10 +328,25 @@ public class StoreServiceImpl implements StoreService {
 
     private StoreCustomerResponse toCustomer(Customer customer) {
 
+        StoreCustomerResponse.Address lastAddress = onlineOrderRepository
+                .findTop50BySale_Customer_IdOrderByCreatedAtDesc(customer.getId())
+                .stream()
+                .findFirst()
+                .map(o -> StoreCustomerResponse.Address.builder()
+                        .addressLine1(o.getAddressLine1())
+                        .addressLine2(o.getAddressLine2())
+                        .city(o.getCity())
+                        .district(o.getDistrict())
+                        .postalCode(o.getPostalCode())
+                        .build())
+                .orElse(null);
+
         return StoreCustomerResponse.builder()
                 .id(customer.getId())
                 .name(customer.getName())
                 .phone(PhoneNumbers.normalizeMobile(customer.getContactNumber()))
+                .email(customer.getEmail())
+                .lastDeliveryAddress(lastAddress)
                 .build();
     }
 
@@ -364,6 +408,11 @@ public class StoreServiceImpl implements StoreService {
     /** Amounts always with two decimals, whether just saved or read back. */
     private static BigDecimal money(BigDecimal amount) {
         return amount.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static String normalizeEmail(String value) {
+        String email = blankToNull(value);
+        return email == null ? null : email.toLowerCase();
     }
 
     private static String blankToNull(String value) {

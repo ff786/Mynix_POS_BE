@@ -23,6 +23,9 @@ WORKDIR /app
 
 COPY --from=build /app/target/backend-0.0.1-SNAPSHOT.jar app.jar
 
+# Sri Lanka time for logs as well (the app sets it for itself too).
+ENV TZ=Asia/Colombo
+
 EXPOSE 8080
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

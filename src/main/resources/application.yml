@@ -9,6 +9,9 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
     password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      # Database-side times (CURRENT_TIMESTAMP defaults) use shop time too.
+      connection-init-sql: SET TIME ZONE '${APP_TIMEZONE:Asia/Colombo}'
 
   jpa:
     hibernate:

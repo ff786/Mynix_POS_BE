@@ -50,4 +50,13 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         AND p.stockQuantity >= :quantity
         """)
     int decrementStock(@Param("id") Long id, @Param("quantity") int quantity);
+
+    /** Puts stock back in one statement (a cancelled online order). */
+    @Modifying(flushAutomatically = true)
+    @Query("""
+        UPDATE Product p
+        SET p.stockQuantity = p.stockQuantity + :quantity
+        WHERE p.id = :id
+        """)
+    int incrementStock(@Param("id") Long id, @Param("quantity") int quantity);
 }

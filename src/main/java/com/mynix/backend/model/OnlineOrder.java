@@ -74,4 +74,10 @@ public class OnlineOrder {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @Column(name = "status_updated_at")
+    private LocalDateTime statusUpdatedAt;
+
+    @Column(name = "status_updated_by", length = 100)
+    private String statusUpdatedBy;
 }

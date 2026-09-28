@@ -16,4 +16,6 @@ public interface OnlineOrderRepository extends JpaRepository<OnlineOrder, Long> 
     boolean existsByPaymentReference(String paymentReference);
 
     List<OnlineOrder> findTop50BySale_Customer_IdOrderByCreatedAtDesc(Long customerId);
+
+    List<OnlineOrder> findTop300ByOrderByCreatedAtDesc();
 }

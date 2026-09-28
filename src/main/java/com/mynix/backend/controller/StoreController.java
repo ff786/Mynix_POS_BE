@@ -9,7 +9,9 @@ import com.mynix.backend.dto.store.StoreSignInRequest;
 import com.mynix.backend.dto.store.StoreVerificationRequest;
 import com.mynix.backend.dto.store.StoreVerificationResponse;
 import com.mynix.backend.exception.StoreNotFoundException;
+import com.mynix.backend.dto.newsletter.NewsletterSignupRequest;
 import com.mynix.backend.service.StoreService;
+import com.mynix.backend.service.impl.NewsletterService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -37,6 +39,7 @@ import java.util.Map;
 public class StoreController {
 
     private final StoreService storeService;
+    private final NewsletterService newsletterService;
 
     @GetMapping("/products")
     public List<StoreProductResponse> products() {
@@ -85,6 +88,11 @@ public class StoreController {
     @GetMapping("/customers/{customerId}/orders")
     public List<StoreOrderResponse> customerOrders(@PathVariable Long customerId) {
         return storeService.getCustomerOrders(customerId);
+    }
+
+    @PostMapping("/newsletter")
+    public Map<String, String> subscribe(@Valid @RequestBody NewsletterSignupRequest request) {
+        return Map.of("status", newsletterService.subscribe(request.getEmail(), request.getVisitorHash()).name());
     }
 
     // Store-only error responses: clear 400/404s for the website, without

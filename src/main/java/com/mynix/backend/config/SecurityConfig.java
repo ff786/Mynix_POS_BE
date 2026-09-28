@@ -111,6 +111,10 @@ public class SecurityConfig {
                                 "/api/categories/**"
                         ).hasRole("ADMIN")
 
+                        .requestMatchers(
+                                "/api/newsletter-subscribers/**"
+                        ).hasRole("ADMIN")
+
                         /*
                          * POS / Sales / Dashboard
                          */

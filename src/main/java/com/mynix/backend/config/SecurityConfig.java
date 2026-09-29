@@ -211,7 +211,8 @@ public class SecurityConfig {
         List<String> origins = new java.util.ArrayList<>(List.of(
                 "http://localhost:5173",
                 "http://127.0.0.1:5173",
-                "https://mynix-pos-fe.vercel.app"
+                "https://mynix-pos-fe.vercel.app",
+                "https://mynix-pos.vercel.app"
         ));
         // Extra POS addresses (e.g. a custom domain): MYNIX_ALLOWED_ORIGINS=https://pos.mynix.lk,https://…
         java.util.Arrays.stream(extraOrigins.split(","))

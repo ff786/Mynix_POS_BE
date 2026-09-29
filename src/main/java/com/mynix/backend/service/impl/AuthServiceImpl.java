@@ -49,7 +49,8 @@ public class AuthServiceImpl implements AuthService {
         return new LoginResponse(
                 token,
                 user.getUsername(),
-                user.getRole().name()
+                user.getRole().name(),
+                Boolean.TRUE.equals(user.getMustChangePassword())
         );
     }
 }

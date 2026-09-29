@@ -39,6 +39,11 @@ public class User {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    /** Set by an emergency reset: nothing else works until a new password is chosen. */
+    @Builder.Default
+    @Column(name = "must_change_password", nullable = false)
+    private Boolean mustChangePassword = false;
+
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 }

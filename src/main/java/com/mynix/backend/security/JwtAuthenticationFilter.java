@@ -20,6 +20,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
+    private final com.mynix.backend.repository.UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(
@@ -66,6 +67,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                     SecurityContextHolder.getContext()
                             .setAuthentication(authentication);
+
+                    // After an emergency reset, only signing in and changing
+                    // the password work until a new password is chosen.
+                    if (!request.getRequestURI().startsWith("/api/auth/")
+                            && userRepository.findByUsername(username)
+                                    .map(u -> Boolean.TRUE.equals(u.getMustChangePassword()))
+                                    .orElse(false)) {
+                        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                        response.setContentType("application/json");
+                        response.getWriter().write(
+                                "{\"code\":\"PASSWORD_CHANGE_REQUIRED\",\"message\":\"Please choose a new password first.\"}");
+                        return;
+                    }
                 }
             }
         } catch (RuntimeException invalidTokenOrUser) {

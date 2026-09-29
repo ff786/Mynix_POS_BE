@@ -37,6 +37,16 @@ textlk:
 
 mynix:
   public-invoice-base-url: ${MYNIX_PUBLIC_INVOICE_BASE_URL:http://localhost:5173/invoice}
+  # Emergency admin reset: set MYNIX_RESET_ADMIN_PASSWORD to a new value (e.g.
+  # today's date) and restart; the admin password becomes Admin@123 once and
+  # must be changed at sign-in with an SMS code sent to MYNIX_ADMIN_PHONE.
+  admin-reset:
+    token: ${MYNIX_RESET_ADMIN_PASSWORD:}
+    username: ${MYNIX_RESET_ADMIN_USERNAME:admin}
+  admin-phone: ${MYNIX_ADMIN_PHONE:0778843815}
+  # Extra addresses the POS may be opened from (comma-separated), besides
+  # https://mynix-pos-fe.vercel.app and localhost.
+  allowed-origins: ${MYNIX_ALLOWED_ORIGINS:}
   # Cloudflare R2 (S3 API) for uploaded product photos and videos. Leave unset
   # to disable uploads; photo links and YouTube links keep working.
   media:

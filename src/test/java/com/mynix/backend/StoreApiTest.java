@@ -180,6 +180,71 @@ class StoreApiTest {
         assertThat(adminPost("/api/products", form).getStatusCode().value()).isEqualTo(400);
     }
 
+    @Test
+    void onlyAdminsChangeProductsButCashiersCanReadThem() {
+        Map<String, Object> form = Map.of("name", "Cashier edit", "categoryId", torch.getCategory().getId(),
+                "buyingPrice", 1, "sellingPrice", 1, "stockQuantity", 1, "minimumStock", 1);
+        String cashier = "Bearer " + cashierToken;
+
+        assertThat(http.get().uri("/api/products").header("Authorization", cashier).retrieve()
+                .toBodilessEntity().getStatusCode().value()).isEqualTo(200);
+        assertThat(http.post().uri("/api/products").header("Authorization", cashier)
+                .contentType(MediaType.APPLICATION_JSON).body(form).retrieve()
+                .toBodilessEntity().getStatusCode().value()).isEqualTo(403);
+        assertThat(http.put().uri("/api/products/" + torch.getId()).header("Authorization", cashier)
+                .contentType(MediaType.APPLICATION_JSON).body(form).retrieve()
+                .toBodilessEntity().getStatusCode().value()).isEqualTo(403);
+        assertThat(http.delete().uri("/api/products/" + torch.getId()).header("Authorization", cashier).retrieve()
+                .toBodilessEntity().getStatusCode().value()).isEqualTo(403);
+        assertThat(productRepository.findById(torch.getId()).orElseThrow().getActive()).isTrue();
+    }
+
+    @Test
+    void variantsAreGroupedWithUniqueOptionsAndReachTheWebsite() {
+        String groupName = "Gem Box " + UUID.randomUUID().toString().substring(0, 8);
+        Map<?, ?> group = adminPost("/api/product-variant-groups", Map.of("name", groupName, "optionName", "Colour"))
+                .getBody();
+        long groupId = ((Number) group.get("id")).longValue();
+        assertThat(group.get("optionName")).isEqualTo("Colour");
+
+        Map<String, Object> form = new HashMap<>(Map.of("name", groupName + " Black", "categoryId", torch.getCategory().getId(),
+                "buyingPrice", 100, "sellingPrice", 450, "stockQuantity", 3, "minimumStock", 1,
+                "variantGroupId", groupId));
+
+        // A product in a group needs its option.
+        assertThat(adminPost("/api/products", form).getStatusCode().value()).isEqualTo(400);
+
+        form.put("variantLabel", "Black");
+        Map<?, ?> black = adminPost("/api/products", form).getBody();
+        assertThat(black.get("variantGroupName")).isEqualTo(groupName);
+        assertThat(black.get("variantLabel")).isEqualTo("Black");
+
+        // Two products can't be the same option of one group.
+        form.put("name", groupName + " Black copy");
+        form.put("variantLabel", "black");
+        assertThat(adminPost("/api/products", form).getStatusCode().value()).isEqualTo(400);
+
+        form.put("name", groupName + " White");
+        form.put("variantLabel", "White");
+        assertThat(adminPost("/api/products", form).getStatusCode().value()).isEqualTo(200);
+
+        Map<String, Object> listed = storeProducts().stream()
+                .filter(p -> Long.valueOf(groupId).equals(((Number) p.getOrDefault("variantGroupId", -1)).longValue())
+                        && "Black".equals(p.get("variantLabel")))
+                .findFirst().orElseThrow();
+        assertThat(listed).containsEntry("variantGroupName", groupName).containsEntry("variantOptionName", "Colour");
+
+        Map<?, ?> members = ((List<Map<?, ?>>) http.get().uri("/api/product-variant-groups")
+                .header("Authorization", "Bearer " + cashierToken).retrieve().body(List.class))
+                .stream().filter(g -> groupName.equals(g.get("name"))).findFirst().orElseThrow();
+        assertThat((List<?>) members.get("products")).hasSize(2);
+
+        // Cashiers can see groups but not change them.
+        assertThat(http.post().uri("/api/product-variant-groups").header("Authorization", "Bearer " + cashierToken)
+                .contentType(MediaType.APPLICATION_JSON).body(Map.of("name", "Nope")).retrieve()
+                .toEntity(Map.class).getStatusCode().value()).isEqualTo(403);
+    }
+
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> storeProducts() {
         return http.get().uri("/api/store/products")

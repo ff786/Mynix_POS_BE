@@ -22,6 +22,13 @@ public class StoreProductResponse {
     private String seoDescription;
     private String seoKeywords;
     private String imageAlt;
+    /** Variable product: the group this product is an option of (null when standalone). */
+    private Long variantGroupId;
+    private String variantGroupName;
+    private String variantOptionName;
+    private String variantLabel;
+    /** Photos and videos in display order ("shared" ones show for every option). */
+    private java.util.List<com.mynix.backend.dto.media.MediaResponse> media;
     private Long categoryId;
     private String category;
     private BigDecimal price;

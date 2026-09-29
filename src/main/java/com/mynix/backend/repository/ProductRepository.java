@@ -19,12 +19,19 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         SELECT p
         FROM Product p
         JOIN FETCH p.category
+        LEFT JOIN FETCH p.variantGroup
         WHERE p.active = true AND p.showOnWebsite = true
         ORDER BY p.fullName
         """)
     List<Product> findActiveWithCategory();
 
     boolean existsBySlug(String slug);
+
+    List<Product> findByVariantGroupIdAndActiveTrueOrderByVariantLabelAsc(Long variantGroupId);
+
+    boolean existsByVariantGroupIdAndVariantLabelIgnoreCaseAndIdNot(Long variantGroupId, String variantLabel, Long id);
+
+    boolean existsByVariantGroupIdAndVariantLabelIgnoreCase(Long variantGroupId, String variantLabel);
 
     boolean existsBySlugAndIdNot(String slug, Long id);
     List<Product> findByNameContainingIgnoreCaseAndActiveTrue(String name);

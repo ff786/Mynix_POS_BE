@@ -28,6 +28,7 @@ import com.mynix.backend.repository.OnlineOrderRepository;
 import com.mynix.backend.repository.ProductRepository;
 import com.mynix.backend.repository.SaleRepository;
 import com.mynix.backend.service.PosService;
+import com.mynix.backend.service.ProductMediaService;
 import com.mynix.backend.service.StoreService;
 import com.mynix.backend.util.PhoneNumbers;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,7 @@ import java.util.Optional;
 public class StoreServiceImpl implements StoreService {
 
     private final ProductRepository productRepository;
+    private final ProductMediaService productMediaService;
     private final CustomerRepository customerRepository;
     private final SaleRepository saleRepository;
     private final OnlineOrderRepository onlineOrderRepository;
@@ -409,6 +411,11 @@ public class StoreServiceImpl implements StoreService {
                 .seoDescription(product.getSeoDescription())
                 .seoKeywords(product.getSeoKeywords())
                 .imageAlt(product.getImageAlt())
+                .variantGroupId(product.getVariantGroup() == null ? null : product.getVariantGroup().getId())
+                .variantGroupName(product.getVariantGroup() == null ? null : product.getVariantGroup().getName())
+                .variantOptionName(product.getVariantGroup() == null ? null : product.getVariantGroup().getOptionName())
+                .variantLabel(product.getVariantLabel())
+                .media(productMediaService.toResponses(product))
                 .categoryId(product.getCategory().getId())
                 .category(product.getCategory().getName())
                 .price(product.getSellingPrice())

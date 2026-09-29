@@ -51,6 +51,22 @@ public class Product {
     @Column(name = "image_alt", length = 160)
     private String imageAlt;
 
+    /** Set when this product is one option of a variable product (colour, size…). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "variant_group_id")
+    private ProductVariantGroup variantGroup;
+
+    /** This product's option within its group, e.g. "Black". */
+    @Column(name = "variant_label", length = 60)
+    private String variantLabel;
+
+    /** Photos and videos in display order (the first photo is also imageUrl). */
+    @Builder.Default
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("position ASC")
+    @org.hibernate.annotations.BatchSize(size = 100)
+    private java.util.List<ProductMedia> media = new java.util.ArrayList<>();
+
     @Column(nullable = false, unique = true, length = 50)
     private String barcode;
 

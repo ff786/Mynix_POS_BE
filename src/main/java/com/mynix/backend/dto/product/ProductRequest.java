@@ -1,5 +1,6 @@
 package com.mynix.backend.dto.product;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
@@ -40,6 +41,21 @@ public class ProductRequest {
 
     @Size(max = 160)
     private String imageAlt;
+
+    /**
+     * Photos and videos in display order. Null leaves them unchanged (and then
+     * imageUrl works as before); a list replaces them and sets imageUrl.
+     */
+    @Valid
+    @Size(max = 30, message = "A product can have up to 30 photos and videos")
+    private java.util.List<com.mynix.backend.dto.media.MediaItemRequest> media;
+
+    /** Variable product group, or null when this product stands alone. */
+    private Long variantGroupId;
+
+    /** This product's option in the group, e.g. "Black" (required with a group). */
+    @Size(max = 60, message = "Keep the option within 60 characters")
+    private String variantLabel;
 
     @NotNull
     private Long categoryId;

@@ -20,6 +20,11 @@ public class ProductResponse {
     private String seoDescription;
     private String seoKeywords;
     private String imageAlt;
+    private Long variantGroupId;
+    private String variantGroupName;
+    private String variantOptionName;
+    private String variantLabel;
+    private java.util.List<com.mynix.backend.dto.media.MediaResponse> media;
     private String barcode;
     private Long categoryId;
     private String category;

@@ -22,6 +22,13 @@ spring:
   flyway:
     enabled: true
 
+  # Product photos (10 MB) and videos (50 MB) from the POS. Nginx in front
+  # needs client_max_body_size of at least 55m too.
+  servlet:
+    multipart:
+      max-file-size: 55MB
+      max-request-size: 56MB
+
 textlk:
   api-url: ${TEXTLK_API_URL:https://app.text.lk/api/v3/sms/send}
   api-token: ${TEXTLK_API_TOKEN}
@@ -30,6 +37,14 @@ textlk:
 
 mynix:
   public-invoice-base-url: ${MYNIX_PUBLIC_INVOICE_BASE_URL:http://localhost:5173/invoice}
+  # Cloudflare R2 (S3 API) for uploaded product photos and videos. Leave unset
+  # to disable uploads; photo links and YouTube links keep working.
+  media:
+    endpoint: ${MEDIA_STORAGE_ENDPOINT:}
+    bucket: ${MEDIA_STORAGE_BUCKET:}
+    access-key: ${MEDIA_STORAGE_ACCESS_KEY:}
+    secret-key: ${MEDIA_STORAGE_SECRET_KEY:}
+    public-base-url: ${MEDIA_PUBLIC_BASE_URL:}
   sms-enabled: ${MYNIX_SMS_ENABLED:true}
 
 jwt:

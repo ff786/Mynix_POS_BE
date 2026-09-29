@@ -6,10 +6,13 @@ import com.mynix.backend.model.Category;
 import com.mynix.backend.model.Product;
 import com.mynix.backend.repository.CategoryRepository;
 import com.mynix.backend.repository.ProductRepository;
+import com.mynix.backend.service.ProductMediaService;
 import com.mynix.backend.service.ProductService;
+import com.mynix.backend.service.VariantGroupService;
 import com.mynix.backend.util.BarcodeGenerator;
 import com.mynix.backend.util.Slugs;
 import lombok.RequiredArgsConstructor;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,8 +24,11 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final BarcodeGenerator barcodeGenerator;
+    private final VariantGroupService variantGroupService;
+    private final ProductMediaService productMediaService;
 
     @Override
+    @Transactional
     public ProductResponse create(ProductRequest request) {
 
         Category category = categoryRepository.findById(request.getCategoryId())
@@ -66,6 +72,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Transactional
     public ProductResponse update(Long id, ProductRequest request) {
 
         Product product = productRepository.findById(id)
@@ -113,6 +120,11 @@ public class ProductServiceImpl implements ProductService {
         product.setSeoKeywords(blankToNull(request.getSeoKeywords()));
         product.setImageAlt(blankToNull(request.getImageAlt()));
 
+        applyVariant(product, request);
+        if (request.getMedia() != null) {
+            productMediaService.replace(product, request.getMedia());
+        }
+
         String requested = blankToNull(request.getSlug());
         if (requested != null) {
             if (isTaken(requested, product.getId())) {
@@ -122,6 +134,31 @@ public class ProductServiceImpl implements ProductService {
         } else if (product.getSlug() == null) {
             product.setSlug(uniqueSlug(Slugs.of(product.getFullName()), product.getId()));
         }
+    }
+
+    /** Variable product option: a group and a label unique within it (or neither). */
+    private void applyVariant(Product product, ProductRequest request) {
+
+        if (request.getVariantGroupId() == null) {
+            product.setVariantGroup(null);
+            product.setVariantLabel(null);
+            return;
+        }
+
+        String label = blankToNull(request.getVariantLabel());
+        if (label == null) {
+            throw new RuntimeException("Enter this product's option in the group, e.g. Black or 14.5x11.5cm.");
+        }
+        Long groupId = request.getVariantGroupId();
+        boolean labelTaken = product.getId() == null
+                ? productRepository.existsByVariantGroupIdAndVariantLabelIgnoreCase(groupId, label)
+                : productRepository.existsByVariantGroupIdAndVariantLabelIgnoreCaseAndIdNot(groupId, label, product.getId());
+        if (labelTaken) {
+            throw new RuntimeException("Another product in this group already uses the option \"" + label + "\".");
+        }
+
+        product.setVariantGroup(variantGroupService.find(groupId));
+        product.setVariantLabel(label);
     }
 
     private String uniqueSlug(String base, Long productId) {
@@ -155,6 +192,11 @@ public class ProductServiceImpl implements ProductService {
                 .seoDescription(product.getSeoDescription())
                 .seoKeywords(product.getSeoKeywords())
                 .imageAlt(product.getImageAlt())
+                .variantGroupId(product.getVariantGroup() == null ? null : product.getVariantGroup().getId())
+                .variantGroupName(product.getVariantGroup() == null ? null : product.getVariantGroup().getName())
+                .variantOptionName(product.getVariantGroup() == null ? null : product.getVariantGroup().getOptionName())
+                .variantLabel(product.getVariantLabel())
+                .media(productMediaService.toResponses(product))
                 .barcode(product.getBarcode())
                 .categoryId(product.getCategory().getId())
                 .category(product.getCategory().getName())

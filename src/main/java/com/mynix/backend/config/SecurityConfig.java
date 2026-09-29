@@ -115,6 +115,48 @@ public class SecurityConfig {
                                 "/api/newsletter-subscribers/**"
                         ).hasRole("ADMIN")
 
+                        // Photo and video uploads.
+                        .requestMatchers(
+                                "/api/media/**"
+                        ).hasRole("ADMIN")
+
+                        // Variant groups: staff read them, admins change them.
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.GET,
+                                "/api/product-variant-groups/**"
+                        ).hasAnyRole(
+                                "ADMIN",
+                                "CASHIER"
+                        )
+
+                        .requestMatchers(
+                                "/api/product-variant-groups/**"
+                        ).hasRole("ADMIN")
+
+                        /*
+                         * Adding, editing and removing products: admins only.
+                         * Cashiers still read products (lists, New Sale).
+                         */
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.POST,
+                                "/api/products/**"
+                        ).hasRole("ADMIN")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.PUT,
+                                "/api/products/**"
+                        ).hasRole("ADMIN")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.PATCH,
+                                "/api/products/**"
+                        ).hasRole("ADMIN")
+
+                        .requestMatchers(
+                                org.springframework.http.HttpMethod.DELETE,
+                                "/api/products/**"
+                        ).hasRole("ADMIN")
+
                         /*
                          * POS / Sales / Dashboard
                          */

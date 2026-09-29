@@ -108,4 +108,19 @@ class LoginSecurityTest {
         return http.get().uri(path).header("Authorization", "Bearer " + token)
                 .retrieve().toBodilessEntity().getStatusCode().value();
     }
+
+    @Test
+    void malformedRequestsGetNoInternalDetails() {
+        org.springframework.http.ResponseEntity<java.util.Map> response = org.springframework.web.client.RestClient.builder()
+                .baseUrl("http://localhost:" + environment.getProperty("local.server.port"))
+                .defaultStatusHandler(status -> true, (req, res) -> { })
+                .build()
+                .post().uri("/api/auth/login")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body("{bad json")
+                .retrieve().toEntity(java.util.Map.class);
+
+        org.assertj.core.api.Assertions.assertThat(response.getStatusCode().value()).isEqualTo(400);
+        org.assertj.core.api.Assertions.assertThat(response.getBody()).containsEntry("message", "The request isn't valid.");
+    }
 }

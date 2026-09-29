@@ -27,8 +27,9 @@ COPY --from=build --chown=mynix:mynix /app/target/backend-0.0.1-SNAPSHOT.jar app
 
 # Sri Lanka time for logs as well (the app sets it for itself too).
 ENV TZ=Asia/Colombo
-# Size the heap from the container's memory limit; override with -e JAVA_TOOL_OPTIONS=...
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+# Heap: 40% of the memory Docker sees (the 1 GB server has no container limit, so
+# this leaves room for the OS and Nginx). Override with -e JAVA_TOOL_OPTIONS=...
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=40.0 -XX:+ExitOnOutOfMemoryError"
 
 USER mynix
 

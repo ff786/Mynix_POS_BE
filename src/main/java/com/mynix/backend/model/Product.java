@@ -1,6 +1,7 @@
 package com.mynix.backend.model;
 
 import jakarta.persistence.*;
+import com.mynix.backend.util.Slugs;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -19,8 +20,36 @@ public class Product {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Short name for POS screens. */
     @Column(nullable = false, length = 150)
     private String name;
+
+    /** Full name: shown on the website and printed on invoices. */
+    @Column(name = "full_name", nullable = false, length = 255)
+    private String fullName;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Builder.Default
+    @Column(name = "show_on_website", nullable = false)
+    private Boolean showOnWebsite = true;
+
+    /** Product page address on the website: /products/{slug}. */
+    @Column(nullable = false, unique = true, length = 120)
+    private String slug;
+
+    @Column(name = "seo_title", length = 70)
+    private String seoTitle;
+
+    @Column(name = "seo_description", length = 170)
+    private String seoDescription;
+
+    @Column(name = "seo_keywords", length = 255)
+    private String seoKeywords;
+
+    @Column(name = "image_alt", length = 160)
+    private String imageAlt;
 
     @Column(nullable = false, unique = true, length = 50)
     private String barcode;
@@ -53,4 +82,15 @@ public class Product {
     @Builder.Default
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    /** Safety net for saves that skip ProductService: the barcode keeps the address unique. */
+    @PrePersist
+    void fillWebsiteDefaults() {
+        if (fullName == null || fullName.isBlank()) {
+            fullName = name;
+        }
+        if (slug == null || slug.isBlank()) {
+            slug = Slugs.of(fullName + " " + barcode);
+        }
+    }
 }

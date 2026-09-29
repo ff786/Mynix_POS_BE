@@ -3,6 +3,8 @@ package com.mynix.backend.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -25,6 +27,28 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(error);
+    }
+
+    /** Form validation: 400 with the first problem, e.g. "Keep the SEO title within 70 characters". */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiError> handleValidation(
+            MethodArgumentNotValidException ex,
+            HttpServletRequest request) {
+
+        FieldError field = ex.getBindingResult().getFieldError();
+        String message = field == null
+                ? "Please check the form."
+                : field.getField() + ": " + field.getDefaultMessage();
+
+        ApiError error = ApiError.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.BAD_REQUEST.value())
+                .error(HttpStatus.BAD_REQUEST.getReasonPhrase())
+                .message(message)
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity.badRequest().body(error);
     }
 
     @ExceptionHandler(RuntimeException.class)

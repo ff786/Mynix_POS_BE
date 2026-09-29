@@ -19,10 +19,14 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         SELECT p
         FROM Product p
         JOIN FETCH p.category
-        WHERE p.active = true
-        ORDER BY p.name
+        WHERE p.active = true AND p.showOnWebsite = true
+        ORDER BY p.fullName
         """)
     List<Product> findActiveWithCategory();
+
+    boolean existsBySlug(String slug);
+
+    boolean existsBySlugAndIdNot(String slug, Long id);
     List<Product> findByNameContainingIgnoreCaseAndActiveTrue(String name);
 
     boolean existsByBarcode(String barcode);

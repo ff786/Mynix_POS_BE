@@ -106,7 +106,7 @@ public class PosServiceImpl implements PosService {
 
             SaleItem saleItem = SaleItem.builder()
                     .product(product)
-                    .productName(product.getName())
+                    .productName(product.getFullName()) // invoices print the full name
                     .barcode(product.getBarcode())
                     .quantity(item.getQuantity())
                     .unitPrice(product.getSellingPrice())
@@ -384,6 +384,7 @@ public class PosServiceImpl implements PosService {
         return PosProductResponse.builder()
                 .id(product.getId())
                 .name(product.getName())
+                .fullName(product.getFullName())
                 .barcode(product.getBarcode())
                 .sellingPrice(product.getSellingPrice())
                 .stockQuantity(product.getStockQuantity())

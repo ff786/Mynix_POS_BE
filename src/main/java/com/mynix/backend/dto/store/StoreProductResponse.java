@@ -14,7 +14,14 @@ import java.math.BigDecimal;
 public class StoreProductResponse {
     private Long id;
     private String barcode;
+    /** Full product name (the short POS name stays in the POS). */
     private String name;
+    private String slug;
+    private String description;
+    private String seoTitle;
+    private String seoDescription;
+    private String seoKeywords;
+    private String imageAlt;
     private Long categoryId;
     private String category;
     private BigDecimal price;

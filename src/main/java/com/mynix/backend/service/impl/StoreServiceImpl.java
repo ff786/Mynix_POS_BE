@@ -101,6 +101,14 @@ public class StoreServiceImpl implements StoreService {
             throw new RuntimeException("Only card orders have a payment reference.");
         }
 
+        // Only products listed on the website can be ordered through it.
+        for (StoreOrderItem item : request.getItems()) {
+            Product product = productRepository.findByBarcode(item.getBarcode().trim()).orElse(null);
+            if (product == null || !product.getActive() || !product.getShowOnWebsite()) {
+                throw new RuntimeException("One of the items in your cart is no longer available online. Please review your cart.");
+            }
+        }
+
         String phone = PhoneNumbers.normalizeMobile(request.getCustomerPhone());
         if (phone == null) {
             throw new RuntimeException("Enter a valid Sri Lankan mobile number.");
@@ -394,7 +402,13 @@ public class StoreServiceImpl implements StoreService {
         return StoreProductResponse.builder()
                 .id(product.getId())
                 .barcode(product.getBarcode())
-                .name(product.getName())
+                .name(product.getFullName())
+                .slug(product.getSlug())
+                .description(product.getDescription())
+                .seoTitle(product.getSeoTitle())
+                .seoDescription(product.getSeoDescription())
+                .seoKeywords(product.getSeoKeywords())
+                .imageAlt(product.getImageAlt())
                 .categoryId(product.getCategory().getId())
                 .category(product.getCategory().getName())
                 .price(product.getSellingPrice())

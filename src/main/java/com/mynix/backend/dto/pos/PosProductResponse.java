@@ -13,6 +13,9 @@ public class PosProductResponse {
 
     private String name;
 
+    /** Printed on receipts and invoices. */
+    private String fullName;
+
     private String barcode;
 
     private BigDecimal sellingPrice;

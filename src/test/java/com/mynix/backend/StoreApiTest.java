@@ -108,6 +108,89 @@ class StoreApiTest {
         assertThat(products).noneMatch(p -> ((String) p.get("barcode")).startsWith("R-"));
     }
 
+    // --- website product details ---------------------------------------------------
+
+    @Test
+    void websiteGetsTheFullNameAndSeoDetailsAndHiddenProductsStayOff() {
+        torch.setFullName("MYNIX Professional Gem Torch " + torch.getBarcode());
+        torch.setDescription("Bright white LED for inclusions.");
+        torch.setSeoTitle("Gem Torch for Gemologists");
+        torch.setSeoDescription("A bright LED gem torch.");
+        productRepository.save(torch);
+
+        Map<String, Object> mine = storeProducts().stream()
+                .filter(p -> torch.getBarcode().equals(p.get("barcode"))).findFirst().orElseThrow();
+        assertThat(mine)
+                .containsEntry("name", torch.getFullName())
+                .containsEntry("slug", torch.getSlug())
+                .containsEntry("description", "Bright white LED for inclusions.")
+                .containsEntry("seoTitle", "Gem Torch for Gemologists")
+                .containsEntry("seoDescription", "A bright LED gem torch.");
+
+        torch.setShowOnWebsite(false);
+        productRepository.save(torch);
+        assertThat(storeProducts()).noneMatch(p -> torch.getBarcode().equals(p.get("barcode")));
+    }
+
+    @Test
+    void hiddenProductsCannotBeOrderedOnline() {
+        torch.setShowOnWebsite(false);
+        productRepository.save(torch);
+        String phone = newPhone();
+
+        ResponseEntity<Map> response = placeOrder(order(1, "CASH_ON_DELIVERY", phone, verifiedToken(phone, "CHECKOUT")));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(productRepository.findById(torch.getId()).orElseThrow().getStockQuantity()).isEqualTo(5);
+    }
+
+    @Test
+    void invoicesPrintTheFullName() {
+        torch.setFullName("MYNIX Professional Gem Torch " + torch.getBarcode());
+        productRepository.save(torch);
+        String phone = newPhone();
+
+        String invoice = (String) placeOrder(order(1, "CASH_ON_DELIVERY", phone, verifiedToken(phone, "CHECKOUT")))
+                .getBody().get("invoiceNumber");
+
+        assertThat(jdbc.queryForObject("""
+                SELECT si.product_name FROM sale_items si JOIN sales s ON s.id = si.sale_id
+                WHERE s.invoice_number = ?""", String.class, invoice)).isEqualTo(torch.getFullName());
+    }
+
+    @Test
+    void staffProductFormFillsDefaultsAndKeepsPageAddressesUnique() {
+        String name = "Loupe " + UUID.randomUUID().toString().substring(0, 8);
+        Map<String, Object> form = new HashMap<>(Map.of("name", name, "categoryId", torch.getCategory().getId(),
+                "buyingPrice", 100, "sellingPrice", 200, "stockQuantity", 1, "minimumStock", 1));
+
+        Map<?, ?> first = adminPost("/api/products", form).getBody();
+        assertThat(first.get("fullName")).isEqualTo(name);
+        assertThat(first.get("showOnWebsite")).isEqualTo(true);
+        String slug = (String) first.get("slug");
+        assertThat(slug).isEqualTo(name.toLowerCase().replace(' ', '-'));
+
+        // Same name again: the page address gets a number instead of clashing.
+        assertThat(adminPost("/api/products", form).getBody().get("slug")).isEqualTo(slug + "-2");
+
+        // Choosing an address another product uses, or an invalid one, is refused.
+        form.put("slug", slug);
+        assertThat(adminPost("/api/products", form).getStatusCode().value()).isEqualTo(400);
+        form.put("slug", "Not A Slug!");
+        assertThat(adminPost("/api/products", form).getStatusCode().value()).isEqualTo(400);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> storeProducts() {
+        return http.get().uri("/api/store/products")
+                .header("Authorization", "Bearer " + storeToken).retrieve().body(List.class);
+    }
+
+    private ResponseEntity<Map> adminPost(String path, Object body) {
+        return http.post().uri(path).header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON).body(body).retrieve().toEntity(Map.class);
+    }
+
     @Test
     void storeAccountCannotReachAnyStaffEndpoint() {
         for (String path : List.of("/api/products", "/api/sales", "/api/customers", "/api/users",

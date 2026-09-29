@@ -1,4 +1,6 @@
 spring:
+  application:
+    name: backend
   jackson:
     time-zone: Asia/Colombo
   config:
@@ -63,5 +65,3 @@ jwt:
 
 server:
   port: ${PORT:8080}
-
-

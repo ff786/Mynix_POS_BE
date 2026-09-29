@@ -22,3 +22,11 @@ target
 
 # Documentation / local files
 HELP.md
+
+# Saved image tarballs (hundreds of MB; never needed in the build context)
+*.tar.gz
+
+# Maven wrapper (the build image ships its own Maven)
+mvnw
+mvnw.cmd
+.mvn
